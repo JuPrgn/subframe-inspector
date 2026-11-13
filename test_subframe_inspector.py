@@ -19,6 +19,8 @@ not that the sky looks like that.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import tempfile
@@ -1351,6 +1353,22 @@ class TestSessionLayout(unittest.TestCase):
         si.clean_review_folder(self.root, S)
         trailing = os.path.join(self.root, "REVIEW", "Trailing")
         self.assertEqual(os.listdir(trailing), ["moved_only.jpg"])
+
+
+class TestFrameProblems(unittest.TestCase):
+    """A worker's stdout never reaches the analysis window, so a frame it
+    cannot measure has to come back as a value for the parent to report."""
+
+    def test_an_unreadable_frame_comes_back_as_a_problem_not_a_print(self):
+        geo = geometry()
+        si._init_worker(si.WorkerContext(S, geo, si.Thresholds.derive(S, geo)))
+        missing = os.path.join(tempfile.gettempdir(), "no_such_frame.fit")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            outcome = si.analyse_frame(missing)
+        self.assertIsInstance(outcome, si.FrameProblem)
+        self.assertEqual(outcome.name, "no_such_frame.fit")
+        self.assertIn("no_such_frame.fit", outcome.message)
+        self.assertEqual(said.getvalue(), "")
 
 
 if __name__ == "__main__":

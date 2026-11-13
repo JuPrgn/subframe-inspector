@@ -1557,6 +1557,21 @@ class FrameStats:
 
 
 @dataclass(frozen=True)
+class FrameProblem:
+    """A frame the worker could not measure, and why.
+
+    Returned rather than printed from the worker: a worker's stdout is
+    its own process's, so the analysis window -- which captures only the
+    parent's -- never saw these, and the summary's ANALYSED ONLY line was
+    all that was left of a lost frame. The parent prints it, on the
+    console and in the log pane alike.
+    """
+
+    name: str
+    message: str
+
+
+@dataclass(frozen=True)
 class WorkerContext:
     """What every worker process needs, sent once at pool start-up."""
 
@@ -1573,8 +1588,13 @@ def _init_worker(context: WorkerContext) -> None:
     _context = context
 
 
-def analyse_frame(path: str) -> FrameStats | None:
-    """Measure one frame. Runs in a worker process; never raises."""
+def analyse_frame(path: str) -> FrameStats | FrameProblem:
+    """Measure one frame. Runs in a worker process; never raises.
+
+    A frame that cannot be measured comes back as a :class:`FrameProblem`
+    for the parent to report, since nothing printed here reaches the
+    analysis window.
+    """
     name = os.path.basename(path)
     assert _context is not None
     settings = _context.settings
@@ -1582,7 +1602,7 @@ def analyse_frame(path: str) -> FrameStats | None:
     try:
         data = load_frame(path)
         if data is None:
-            return None
+            return FrameProblem(name, f"Could not read {name}: no image data")
 
         small = working_image(data, _context.geometry.step)
         cleaned, mask = bright_structure(small, settings)
@@ -1678,12 +1698,10 @@ def analyse_frame(path: str) -> FrameStats | None:
         # this frame is fine and the machine is not. Losing it silently
         # would leave a session short of frames while the summary still
         # counted them, so the caller reports the shortfall.
-        print(f"⚠️ Out of memory on {name} — try --workers with a smaller "
-              f"number, or close something.")
-        return None
+        return FrameProblem(name, f"Out of memory on {name} — try --workers "
+                                  f"with a smaller number, or close something.")
     except Exception as error:  # a bad file must not abort the session
-        print(f"⚠️ Could not read {name}: {error}")
-        return None
+        return FrameProblem(name, f"Could not read {name}: {error}")
 
 
 # ======================================================================
@@ -2021,12 +2039,15 @@ def classify_session(frames_folder: str | Session, mode: str | None = "copy",
                              initargs=(context,)) as pool:
         # Without a chunk size each frame is a separate task and the
         # scheduling costs more than the work on short runs.
-        chunk = max(1, len(paths) // (4 * (os.cpu_count() or 4)))
+        workers = settings.max_workers or os.cpu_count() or 4
+        chunk = max(1, len(paths) // (4 * workers))
         frames = []
-        for done, frame in enumerate(pool.map(analyse_frame, paths,
-                                              chunksize=chunk), start=1):
-            if frame is not None:
-                frames.append(frame)
+        for done, outcome in enumerate(pool.map(analyse_frame, paths,
+                                                chunksize=chunk), start=1):
+            if isinstance(outcome, FrameProblem):
+                print(f"⚠️ {outcome.message}")
+            else:
+                frames.append(outcome)
             if progress is not None:
                 progress(done, len(paths))
 
