@@ -297,8 +297,19 @@ neighbouring frame is now kept as a satellite (`mark_recurring_tracks`),
 which cleared the false one and changed nothing else on 1785 replayed
 frames. It is a decision, not a measurement: a replay runs it after
 refitting every track, so the two must stay in that order.
-Details and numbers in `DETECTION.md`, under "First confirmed meteors".
-Do not tune `wide_track_width` on these two.
+That green glow is now measured (`measure_track_green`, 18.4 and 10.0
+sigma on the meteors against at most 1.3 over 77 satellites from eleven
+sessions) and is a second way into Meteors, at `meteor_green_sigma` = 4.
+Details and numbers in `DETECTION.md`, under "First confirmed meteors"
+and "The green glow, now measured". Do not tune `wide_track_width` on
+these two.
+
+**The colour measure has a measurement group of its own**, `colour`,
+added after bundles already existed. A bundle without that group is not
+stale -- its tracks were never measured for colour, carry green = 0, and
+replay exactly as judged -- so `stale_parts` ignores a group the bundle
+does not know, and the replay says the green rule cannot fire on it.
+Keep that distinction for any future measure: missing is not stale.
 The owner reports the old aircraft rule firing correctly on a sub of
 their own that is not in this repository — so if you touch the width
 measure, ask them to re-run that frame. That precedent also settles the

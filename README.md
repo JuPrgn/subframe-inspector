@@ -161,7 +161,7 @@ is filed under each of them.
 | ☁️ Haze / cloud | the sky background is well above the session's own median |
 | 🫨 Trailing | the stars have lost their shape — drawn out into ovals, swollen without leaning anywhere, or printed twice by a jolt |
 | 🛰️ Satellite | a straight track, no wider than the seeing disc |
-| ☄️ Meteor | a wide track with a bright head and a fading tail |
+| ☄️ Meteor | a track with a green glow beside it, or a wide one with a bright head and a fading tail |
 | ✈️ Aircraft | a wide track lit evenly, on an unusually bright frame |
 
 Each alert is decided on its own, so one frame can raise several — a hazy
@@ -290,9 +290,23 @@ than from its outline, which a few stray pixels can inflate fivefold.
 
 Which kind of wide thing it is then comes from the light *along* the
 trail: evenly lit for the whole exposure is an aircraft, a bright head
-with a fading tail is a meteor. That last distinction is the one part of
-this with no confirmed example behind it — see
-[Known limits](#known-limits).
+with a fading tail is a meteor.
+
+**By colour**, which is what actually caught the first real meteors. A
+meteor excites oxygen in the upper air, which glows green at 557.7 nm
+for a few seconds after it has passed, and the wind up there pushes that
+glow to one side of the trail. A satellite only reflects sunlight and
+cannot make it. The tool reads the raw frame, where the green pixels of
+the sensor are kept apart from the red and blue ones, and measures how
+much greener than the sky a band beside the trail is — along the whole
+length, so that a star sitting on the trail cannot fake it. Both meteors
+confirmed so far stood out at 10 and 18 times the noise; no satellite
+out of 77 passed 1.3.
+
+**By persistence.** A meteor lasts a fraction of a second and an
+aircraft crosses the field in a few, so neither can leave the same line
+on two frames in a row. A satellite in a high orbit does, and a track
+that comes back on the next frame is always kept as a satellite.
 
 ### Field shift and cloud
 
@@ -359,6 +373,7 @@ exist:
 | `track_recurs` | 1 when the same line is on the previous or next frame: a slow satellite, never a meteor |
 | `track_rms_width`, `track_glow`, `track_peak` | its flux-weighted width, and its brightness per unit length and at its brightest, in units of the frame noise |
 | `head_ratio`, `head_position`, `taper` | how the light sits along it |
+| `track_green` | the green glow beside the trail, in sigma — a meteor's signature, 4 or more |
 | `shift_px`, `shift_dx`, `shift_dy`, `shift_confidence` | the field shift |
 | `doubling_px`, `doubling_fraction` | the jolt detector |
 
@@ -400,11 +415,13 @@ answer to the question.
 
 ## Known limits
 
-- **Meteors usually end up in Satellites.** The first two meteors
-  confirmed in this data were thinner than the meteor gate and were filed
-  as satellites. A slow satellite was once filed as a meteor; a track
-  that comes back on the same line on the next frame is now always kept
-  as a satellite. What
+- **Meteors are recognised by their green glow.** The first two meteors
+  confirmed in this data were too thin for the width test; what gives a
+  meteor away is a diffuse green glow beside the trail, which the tool
+  now measures on the raw frame (`track_green`). A faint meteor whose
+  glow is lost in the sky, or one on a frame without colour information,
+  still lands in Satellites. A track that comes back on the same line on
+  the next frame is always kept as a satellite. What
   gives a meteor away on the preview is a green glow along one side of the
   trail, on a single frame; check the Satellites folder for it, and tick
   what you find as Meteor in the labeller. No aircraft has been confirmed

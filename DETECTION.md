@@ -194,13 +194,15 @@ Over 26 confirmed satellites:
 | tapered → meteor | `meteor_taper` | 2.0 |
 | evenly lit and bright → aircraft | `aircraft_brightness` | 1.5 x session noise |
 | same line on a neighbouring frame → satellite, whatever the width | `track_recur_offset`, `track_recur_tilt` | 40 arcsec, 3° |
+| green glow beside the trail → meteor, whatever the width | `meteor_green_sigma` | 4.0 sigma |
 
 Use the flux-weighted width, not the geometric extent: outlying pixels
 put the widest satellites at 7.6 working px on that measure. Do not
 normalise it by the stars — it spans 0.62 to 2.30 over the same tracks.
 
-The meteor/aircraft split is **unvalidated**: no aircraft has been
-confirmed in this data, and the two meteors below were not caught by it.
+No aircraft has been confirmed in this data. Meteors have two ways in:
+wide and tapered, which has never caught a real one, and the green glow
+below, which caught both.
 
 ### First confirmed meteors, and what they say about width
 
@@ -261,12 +263,43 @@ Meteors → Satellites; on `LBN 550_IRCUT_20260909` it changes nothing.
 It never adds or removes an alert, only picks the folder. Both confirmed
 meteors are on a frame alone and are untouched by it.
 
-One lead left, not measured yet:
+### The green glow, now measured
 
-- **Colour.** The green is the strongest single cue the eye used. The
-  detector measures the raw Bayer mosaic, which does keep the green
-  photosites apart, so a green excess along the track is measurable in
-  principle. Untested.
+What the eye used first is now a number. `measure_track_green` reads the
+raw mosaic (`BAYERPAT` from the header), where green photosites stay
+apart from red and blue, and compares green with the rest in a band
+**4 to 24 px** beside the line, on each side, against the same excess
+**60-80 px** out, which carries the sky's own colour. Medians
+throughout, since stars sit on every band. A side counts by its
+**weakest third** of the track, so a star or a glint on part of the
+trail cannot fake it; the best side is divided by the scatter of the
+same quantity on empty bands 40-80 px out.
+
+Why that shape: the first attempt, a green ratio over ±14 px normalised
+by the core, did not separate at all — the core of a meteor trail is
+*redder* than the sky, and the glow sits beside it, on one side,
+4 to 24 px out. Seen across the trail, in thirds along it, both meteors
+show +30 to +90 counts of green excess there in every third; satellites,
+bright ones included, show noise of ±20 with no structure.
+
+| | green glow, sigma |
+| --- | ---: |
+| meteor `20261105-010712` | 18.4 |
+| meteor `20261103-045310` | 10.0 |
+| 31 satellites, M 45 | ≤ 0.6 |
+| 46 satellites, ten other sessions (NGC 6910 dense fields, LP filter, Nova Sge, Delta Sge, LBN 550) | ≤ 1.3 |
+
+`meteor_green_sigma` = 4 sits three times above the satellites and
+2.5 times below the fainter meteor. Replayed on all of M 45 through the
+full pipeline: exactly the two confirmed meteors are filed under
+Meteors, nothing else moves. It costs about 50 ms on a frame with a
+track, nothing on the others.
+
+Blind spots: a frame with no `BAYERPAT`, or already debayered, has no
+mosaic to read and scores 0; a meteor near the edge with no sky 60-80 px
+beside it scores 0; a faint meteor whose glow is below the sky noise is
+not caught. Two meteors fixed the method, not the number — re-check the
+bar as confirmed ones accumulate.
 
 **Blind spot, and it is closed.** On `NGC 7380_Wizard` (1080x1920, 20 s
 subs) all 22 ticked satellites are missed and no fragment exists — not

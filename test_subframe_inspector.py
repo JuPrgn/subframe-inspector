@@ -482,6 +482,56 @@ class TestTrackProfile(unittest.TestCase):
         self.assertGreater(profile.taper, 2.0)
 
 
+class TestTrackGreen(unittest.TestCase):
+    """The green glow a meteor leaves beside its trail, on a raw mosaic."""
+
+    STEP = 2
+
+    def setUp(self):
+        rng = np.random.default_rng(3)
+        self.sky = rng.normal(1000.0, 20.0, (400, 800)).astype(np.float32)
+        self.sky[199:202, 100:700] += 800.0          # the trail, all colours
+        rows, cols = np.indices(self.sky.shape)
+        self.green_sites = (rows % 2) == (cols % 2)  # GRBG
+        self.track = si.Track(span=300.0, coverage=1.0, residual=0.0,
+                              fragments=1, max_width=1.0, touches_edge=False,
+                              tilt=0.0, centre_x=200.0, centre_y=100.0,
+                              unit_x=1.0, unit_y=0.0)
+
+    def glow(self, columns=slice(100, 700), strength=40.0):
+        image = self.sky.copy()
+        band = np.zeros_like(image, dtype=bool)
+        band[206:216, columns] = True               # one side of the line
+        image[band & self.green_sites] += strength
+        return image
+
+    def green(self, image, bayer="GRBG"):
+        return si.measure_track_green(image, self.track, self.STEP, bayer)
+
+    def test_a_green_glow_on_one_side_stands_out(self):
+        self.assertGreater(self.green(self.glow()), 4.0)
+
+    def test_a_plain_trail_has_none(self):
+        self.assertLess(self.green(self.sky), 2.0)
+
+    def test_a_glow_on_part_of_the_trail_does_not_count(self):
+        """A star or a glint covers a stretch; a meteor's glow runs the length."""
+        self.assertLess(self.green(self.glow(columns=slice(100, 260))), 2.0)
+
+    def test_no_colour_without_a_bayer_pattern(self):
+        self.assertEqual(self.green(self.glow(), bayer=""), 0.0)
+
+    def test_the_header_gives_the_pattern(self):
+        header = {"FOCALLEN": 160.0, "XPIXSZ": 2.9, "BAYERPAT": "grbg"}
+        self.assertEqual(si.Geometry.from_header(header, (3840, 2160), S).bayer,
+                         "GRBG")
+
+    def test_a_colour_frame_has_no_mosaic_to_read(self):
+        header = {"FOCALLEN": 160.0, "XPIXSZ": 2.9, "BAYERPAT": "GRBG"}
+        self.assertEqual(si.Geometry.from_header(header, (3, 3840, 2160), S).bayer,
+                         "")
+
+
 class TestFieldShift(unittest.TestCase):
 
     def test_a_known_translation_is_recovered(self):
@@ -665,6 +715,21 @@ class TestClassification(unittest.TestCase):
         later = self.frame(track=self.wide_tapered(centre_x=900.0))
         self.mark(meteor, self.frame(), later)
         self.assertFalse(meteor.track_recurs)
+
+    def green_track(self):
+        return si.replace(self.track(width=1.0),
+                          profile=si.TrackProfile(width=1.0, green=10.0))
+
+    def test_a_thin_track_with_a_green_glow_is_a_meteor(self):
+        """Both confirmed meteors were too thin for the width gate."""
+        meteor = self.frame(track=self.green_track())
+        self.assertEqual(self.categories(meteor), {si.CATEGORY_METEORS})
+
+    def test_a_green_track_seen_again_is_still_a_satellite(self):
+        meteor = self.frame(track=self.green_track())
+        self.mark(meteor, self.frame(track=si.replace(self.green_track(),
+                                                      centre_x=700.0)))
+        self.assertEqual(self.categories(meteor), {si.CATEGORY_SATELLITES})
 
     def test_recurrence_never_removes_a_track(self):
         satellite = self.frame(track=self.track())

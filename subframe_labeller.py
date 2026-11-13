@@ -109,6 +109,7 @@ REPORT_READOUT = (
     ("haze_sigma", "haze {:.1f}σ", 0.05),
     ("track_span", "track {:.0f}px", 0.5),
     ("track_rms_width", "width {:.2f}px", 0.005),
+    ("track_green", "green {:.1f}σ", 1.0),
     ("shift_px", "shift {:.0f}px", 0.5),
 )
 

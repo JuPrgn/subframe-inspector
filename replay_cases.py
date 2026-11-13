@@ -156,7 +156,21 @@ def stale_parts(bundle: dict) -> dict[str, tuple[str, str]]:
         return {} if was == now else {"everything (format 1)": (was, now)}
     return {name: (stored.get(name), current[name])
             for name in MEASUREMENT_PARTS
-            if stored.get(name) != current[name]}
+            if name in stored and stored[name] != current[name]}
+
+
+def unmeasured_parts(bundle: dict) -> list[str]:
+    """Measurement groups added since the bundle was written.
+
+    Not stale: those numbers were never taken, so the bundle carries the
+    defaults and replays exactly as it was judged. What it cannot do is
+    speak for a rule that reads them -- the green glow, for a bundle from
+    before the colour measure -- and the replay says so.
+    """
+    stored = bundle.get("fingerprints")
+    if not stored:
+        return []
+    return [name for name in MEASUREMENT_PARTS if name not in stored]
 
 
 def replay_settings(exported: Settings, as_exported: bool) -> Settings:
@@ -775,6 +789,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                               arguments.stale_ok, labels,
                               arguments.as_exported)
         print(f"📦 {path}: {len(found)} frames")
+        missing = unmeasured_parts(read_cases(path))
+        if missing:
+            print(f"   ℹ️ written before the {', '.join(missing)} measurement: "
+                  f"the rules that read it cannot fire on this bundle.")
         by_path[path] = found
         results.extend(found)
 

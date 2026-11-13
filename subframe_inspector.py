@@ -236,6 +236,15 @@ class Settings:
     # removes an alert -- it decides which folder a track goes to.
     track_recur_offset: float = 40.0    # arcsec, across the line
     track_recur_tilt: float = 3.0       # degrees
+    # The second way into Meteors, and the one that caught both confirmed
+    # meteors, which were too thin for the width gate: a diffuse green
+    # glow beside the trail along its whole length (measure_track_green).
+    # Measured: 9.4 and 18.8 sigma on the two meteors of M 45, at most 1.3
+    # over 77 satellites from eleven sessions, dense Milky Way fields and
+    # the LP filter included. 4 sits three times above the satellites and
+    # twice below the fainter meteor. A track found again on the next
+    # frame is a satellite whatever its colour.
+    meteor_green_sigma: float = 4.0
 
     # -- Cloud and haze -------------------------------------------------
     # Three signatures, and the third one carries most of the recall.
@@ -440,6 +449,9 @@ class Geometry:
     # guess, so the run says so out loud rather than quietly reporting
     # nonsense on somebody else's camera.
     scale_is_assumed: bool = False
+    # The colour filter layout of the raw mosaic, e.g. 'GRBG', or '' when
+    # the header gives none -- then nothing colour-based is measured.
+    bayer: str = ""
 
     @classmethod
     def of(cls, path: str, settings: Settings) -> "Geometry":
@@ -477,8 +489,11 @@ class Geometry:
         step = min(max(int(round(settings.working_scale / scale)), 1), 4)
 
         model = str(header.get("CREATOR") or header.get("TELESCOP") or "unknown")
+        bayer = str(header.get("BAYERPAT") or "").strip().upper()
+        if len(bayer) != 4 or set(bayer) - set("RGB") or len(shape) != 2:
+            bayer = ""
         return cls(width=width, height=height, pixel_scale=scale, step=step,
-                   model=model, scale_is_assumed=assumed)
+                   model=model, scale_is_assumed=assumed, bayer=bayer)
 
     @property
     def working_scale(self) -> float:
@@ -957,6 +972,7 @@ class TrackProfile:
     glow: float = 0.0           # flux per pixel of span, in units of the noise
     peak: float = 0.0           # brightest pixel on the track, same units
     width: float = 0.0          # flux-weighted width across the line, working px
+    green: float = 0.0          # green glow beside the line, in sigma; see measure_track_green
 
 
 @dataclass(frozen=True)
@@ -1277,6 +1293,79 @@ def measure_track_profile(cleaned: np.ndarray, labels: np.ndarray,
     )
 
 
+def measure_track_green(data: np.ndarray, track: Track, step: int,
+                        bayer: str) -> float:
+    """How strongly a green glow runs alongside a track, in sigma.
+
+    What gave both confirmed meteors away to the eye, before any number
+    did: a diffuse green band beside the trail, on one side only, along
+    its whole length -- the 557.7 nm oxygen line, which lingers for
+    seconds after a meteor and drifts with the upper-air wind. A
+    satellite only reflects sunlight and cannot make it. Measured on the
+    raw mosaic, where green photosites stay apart from red and blue.
+
+    For each third of the track and each side of it, the green excess --
+    median of the green photosites minus median of the others, over a
+    band 4 to 24 px from the line -- relative to the same excess 60-80 px
+    away, which carries the sky's own colour. A side counts only by its
+    weakest third, so a star or a glint on part of the trail cannot fake
+    it. The best side is then divided by the scatter of the same quantity
+    on empty bands 40-80 px out. Medians throughout, because stars sit on
+    every band.
+
+    Measured on M 45: 18.8 and 9.4 sigma for the two confirmed meteors,
+    at most 1.3 over 31 satellites. Zero when there is no colour to read
+    or too little sky around the track.
+    """
+    if data.ndim != 2 or not bayer or track.span <= 0:
+        return 0.0
+    half = track.span * step / 2.0 * 0.9
+    if half < 30:
+        return 0.0
+    along = np.arange(-half, half, 1.0)
+    across = np.arange(-80.0, 81.0, 1.0)
+    grid_along, grid_across = np.meshgrid(along, across, indexing="ij")
+    x = np.rint(track.centre_x * step + grid_along * track.unit_x
+                - grid_across * track.unit_y).astype(int)
+    y = np.rint(track.centre_y * step + grid_along * track.unit_y
+                + grid_across * track.unit_x).astype(int)
+    inside = (x >= 0) & (x < data.shape[1]) & (y >= 0) & (y < data.shape[0])
+    values = np.zeros(x.shape, dtype=np.float64)
+    values[inside] = data[y[inside], x[inside]]
+    green_sites = np.array([c == "G" for c in bayer])[(y % 2) * 2 + (x % 2)]
+
+    def excess(mask: np.ndarray) -> float | None:
+        green, other = mask & green_sites, mask & ~green_sites
+        if green.sum() < 20 or other.sum() < 20:
+            return None
+        return float(np.median(values[green]) - np.median(values[other]))
+
+    thirds = np.minimum((np.arange(along.size) * 3) // along.size, 2)
+    sides: dict[int, list[float]] = {1: [], -1: []}
+    empty: list[float] = []
+    for third in range(3):
+        rows = (thirds == third)[:, None] & inside
+        sky = excess(rows & (np.abs(grid_across) >= 60))
+        if sky is None:
+            return 0.0
+        for sign in (1, -1):
+            side = sign * grid_across
+            band = excess(rows & (side >= 4) & (side < 24))
+            if band is None:
+                return 0.0
+            sides[sign].append(band - sky)
+            for low, high in ((40, 60), (60, 80)):
+                null = excess(rows & (side >= low) & (side < high))
+                if null is not None:
+                    empty.append(null - sky)
+    if len(empty) < 6:
+        return 0.0
+    scatter = float(np.std(empty))
+    if scatter <= 0:
+        return 0.0
+    return max(min(values_) for values_ in sides.values()) / scatter
+
+
 # ======================================================================
 #  Star doubling
 # ======================================================================
@@ -1539,8 +1628,12 @@ def analyse_frame(path: str) -> FrameStats | None:
 
         track = find_track(segments, settings, thresholds)
         if track is not None:
-            track = replace(track, profile=measure_track_profile(
-                cleaned, labels, track, float(np.std(small))))
+            profile = measure_track_profile(cleaned, labels, track,
+                                            float(np.std(small)))
+            track = replace(track, profile=replace(
+                profile, green=measure_track_green(
+                    data, track, _context.geometry.step,
+                    _context.geometry.bayer)))
 
         # Keep the compact blobs as landmarks for the frame-to-frame
         # shift. Only this small array leaves the worker, not the
@@ -1754,8 +1847,15 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
         # Only a one-off track can be a meteor or an aircraft; see
         # track_recur_offset.
         is_wide = is_wide and not frame.track_recurs
+        is_green = (shape.green >= settings.meteor_green_sigma
+                    and not frame.track_recurs)
 
-        if is_wide and is_tapered:
+        if is_green:
+            alerts.append(Alert(CATEGORY_METEORS,
+                                f"☄️ METEOR (green glow beside the trail, "
+                                f"{shape.green:.1f} sigma: {geometry_note})"
+                                f"{edge_note}"))
+        elif is_wide and is_tapered:
             alerts.append(Alert(CATEGORY_METEORS,
                                 f"☄️ METEOR (wide and uneven: {geometry_note}, "
                                 f"halves {shape.taper:.1f}:1, brightest at "
@@ -1804,6 +1904,7 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
         "head_ratio": round(profile.head_ratio, 2),
         "head_position": round(profile.head_position, 2),
         "taper": round(profile.taper, 2),
+        "track_green": round(profile.green, 1),
         "shift_px": round(float(np.hypot(shift_dx, shift_dy)), 1),
         "shift_dx": round(shift_dx, 1),
         "shift_dy": round(shift_dy, 1),
@@ -2427,6 +2528,12 @@ MEASUREMENT_PARTS = {
               "high_percentile", "_principal_axes", "measure_components"),
     "stars": ("centre_crop_bounds", "crop_centre", "measure_stars"),
     "profile": ("measure_track_profile",),
+    # A group of its own, added after bundles already existed. A bundle
+    # written before it has no hash for it: its tracks were simply never
+    # measured for colour and carry green = 0, which replays exactly as
+    # they were judged then. That is a measurement missing, not one gone
+    # stale, so it does not condemn the rest of the bundle.
+    "colour": ("measure_track_green",),
 }
 
 # ...and the settings those functions read. A bundle records every
