@@ -205,6 +205,11 @@ def format_readout(row: dict[str, str]) -> str:
             value = float(row.get(column, "") or 0.0)
         except ValueError:
             continue
+        # A green glow below the sky's own colour is noise, not a finding;
+        # showing it as "green -2.6σ" only gets in the way of spotting
+        # the real ones.
+        if column == "track_green" and value < 0:
+            continue
         if abs(value) > minimum:
             parts.append(template.format(value))
     return " · ".join(parts)
