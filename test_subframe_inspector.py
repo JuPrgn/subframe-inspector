@@ -989,9 +989,11 @@ class TestCaseExport(unittest.TestCase):
         would be measured against the wrong reference -- and a memory spike
         is enough to cause that."""
         frames = [self.frame()]
-        written = si.write_cases(self.tmp(), frames, [{"categories": ""}],
-                                 self.reference, self.geo, S, expected=5)
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            written = si.write_cases(self.tmp(), frames, [{"categories": ""}],
+                                     self.reference, self.geo, S, expected=5)
         self.assertIsNone(written)
+        self.assertIn("4 of 5", said.getvalue())
 
     def test_a_complete_session_writes_one(self):
         folder = self.tmp()

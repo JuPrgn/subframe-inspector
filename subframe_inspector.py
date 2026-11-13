@@ -188,7 +188,7 @@ class Settings:
     # Measured over nine confirmed trails and the chance lines found on
     # trailed frames: real 0.07 to 0.30 working px of RMS residual,
     # chance 1.02 and 7.12. An earlier "at least six fragments" rule sat
-    # in a gap it had no data for and missed a four-fragment satellite.
+    # in a gap it had no data for and missed a three-fragment satellite.
     #
     # So: three pieces or more are judged on how straight they are, and
     # nothing else -- one or two, which fit any line exactly, have to be
@@ -240,11 +240,11 @@ class Settings:
     # The second way into Meteors, and the one that caught both confirmed
     # meteors, which were too thin for the width gate: a diffuse green
     # glow beside the trail along its whole length (measure_track_green).
-    # Measured: 9.4 and 18.8 sigma on the two meteors of M 45, at most 1.3
-    # over 77 satellites from eleven sessions, dense Milky Way fields and
-    # the LP filter included. 4 sits three times above the satellites and
-    # twice below the fainter meteor. A track found again on the next
-    # frame is a satellite whatever its colour.
+    # Measured: 18.4 and 10.0 sigma on the two meteors of M 45, at most
+    # 1.3 over 77 satellites from eleven sessions, dense Milky Way fields
+    # and the LP filter included. 4 sits three times above the satellites
+    # and 2.5 times below the fainter meteor. A track found again on the
+    # next frame is a satellite whatever its colour.
     meteor_green_sigma: float = 4.0
 
     # -- Cloud and haze -------------------------------------------------
@@ -327,8 +327,9 @@ class Settings:
     # A brief jolt during the exposure prints every star twice, offset by
     # one shared vector. The stars stay round, so no shape measurement
     # sees it. Below the lower bound we would only be pairing the two
-    # halves of a slightly smeared star; above the upper one it is a
-    # proper trail, already covered by the elongation test.
+    # halves of a slightly smeared star. The upper bound is geometric,
+    # see doubling_max_fraction: a knock can be as large as it likes, and
+    # the old "beyond that it is a trail" reasoning hid a real one.
     doubling_min_distance: float = 22.0   # arcsec
     # How far apart the two images may be, as a share of the shorter side
     # of the region the stars are measured in. Geometric on purpose: past
@@ -412,11 +413,11 @@ class Settings:
     export_grid: int = 4
     export_star_map: int = 400
 
-    # Debug mode writes an annotated copy of every flagged preview into
-    # REVIEW/_debug/, showing what the detector actually saw. It needs
-    # Pillow, keeps far more per-frame data alive, and roughly doubles
-    # the run time -- for working out why a frame was flagged, not for
-    # everyday use.
+    # Debug mode annotates the copies filed under REVIEW/<category>/
+    # instead of copying them plain, showing what the detector actually
+    # saw. It needs Pillow, keeps far more per-frame data alive, and
+    # roughly doubles the run time -- for working out why a frame was
+    # flagged, not for everyday use.
     debug: bool = False
 
 
@@ -2512,10 +2513,6 @@ def write_reports(frames_folder: str, rows: list[dict],
 
 
 # ======================================================================
-#  Entry point
-# ======================================================================
-
-# ======================================================================
 #  Case export
 # ======================================================================
 
@@ -2919,6 +2916,10 @@ def frame_label(filename: str) -> str:
     stem = os.path.splitext(os.path.basename(filename))[0]
     return stem.rsplit("_", 1)[-1] if "_" in stem else stem
 
+
+# ======================================================================
+#  Deleting the FITS, and the command line
+# ======================================================================
 
 def select_for_deletion(categories_by_frame: dict[str, list[str]],
                         wanted: set[str] | None) -> dict[str, list[str]]:

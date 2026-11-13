@@ -419,8 +419,8 @@ Nine sessions, 2484 frames, 648 labelled:
 | | caught | ticked | recall | wrong | precision | unjudged |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Trailing | 230 | 344 | 67% | 6 | 97% | 36 |
-| Satellites | 58 | 97 | 60% | 3 | 95% | 0 |
-| Clouds_Haze | 162 | 222 | 73% | 11 | 94% | 20 |
+| Satellites | 58 | 97 | 60% | 2 | 97% | 0 |
+| Clouds_Haze | 178 | 222 | 80% | 11 | 94% | 20 |
 
 `LBN 550` hand-picked reference: 14/14 trailing, 3/3 satellites. Re-check
 after any change to detection.
