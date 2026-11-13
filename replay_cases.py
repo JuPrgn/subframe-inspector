@@ -254,15 +254,20 @@ def refit_frame(frame: FrameStats, settings: Settings, thresholds: Thresholds,
 
 def replay_bundle(path: str, overrides: dict, refit: bool, stale_ok: bool,
                   labels: dict[str, dict] | None = None,
-                  as_exported: bool = False) -> list[Replayed]:
+                  as_exported: bool = False,
+                  bundle: dict | None = None) -> list[Replayed]:
     """Re-run one session's decisions from its bundle.
 
     A bundle carries the labels that existed when it was written. Pass
     ``labels`` to score against a labels.csv written since -- keyed on the
     frame's timestamp, so it finds its frames whatever the folder has
     been renamed to and whichever session the file came from.
+
+    ``bundle`` is the file already read, when the caller has it: a bundle
+    runs to tens of megabytes gzipped, and parsing it once is enough.
     """
-    bundle = read_cases(path)
+    if bundle is None:
+        bundle = read_cases(path)
     stale = stale_parts(bundle)
     if stale and not stale_ok:
         detail = "\n".join(f"     {name}: bundle {was}, this build {now}"
@@ -521,7 +526,7 @@ def make_preview(folder: str, frame_id: str, destination: str,
     return kind
 
 
-def collect_disagreements(paths: Sequence[str], results_by_path: dict,
+def collect_disagreements(bundles: dict[str, dict], results_by_path: dict,
                           out_dir: str, per_category: int, width: int,
                           all_categories: bool = False,
                           fits_budget: float = 0.0) -> None:
@@ -539,8 +544,7 @@ def collect_disagreements(paths: Sequence[str], results_by_path: dict,
     missing_folders = []
     fits_candidates = []
 
-    for path in paths:
-        bundle = read_cases(path)
+    for path, bundle in bundles.items():
         target = bundle["session"].get("target") or bundle["session"]["id"]
         folder = session_folder_for(target)
         if folder is None:
@@ -784,21 +788,26 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     results: list[Replayed] = []
     by_path: dict[str, list[Replayed]] = {}
+    bundles: dict[str, dict] = {}
     for path in paths:
+        # Read once: the replay, the staleness note and the preview
+        # collection all work from the same dict.
+        bundle = read_cases(path)
         found = replay_bundle(path, overrides, not arguments.no_refit,
                               arguments.stale_ok, labels,
-                              arguments.as_exported)
+                              arguments.as_exported, bundle=bundle)
         print(f"📦 {path}: {len(found)} frames")
-        missing = unmeasured_parts(read_cases(path))
+        missing = unmeasured_parts(bundle)
         if missing:
             print(f"   ℹ️ written before the {', '.join(missing)} measurement: "
                   f"the rules that read it cannot fire on this bundle.")
         by_path[path] = found
+        bundles[path] = bundle
         results.extend(found)
 
     report(results, arguments.changes)
     if arguments.disagreements:
-        collect_disagreements(paths, by_path, arguments.disagreements,
+        collect_disagreements(bundles, by_path, arguments.disagreements,
                               arguments.per_category, arguments.preview_width,
                               arguments.all_categories, arguments.fits_budget)
     return 0
