@@ -967,10 +967,6 @@ class Labeller:
         self.filter_var.set(name)
         self._apply_filter()
 
-    def _i_said(self, frame: Frame, key: str) -> bool:
-        entry = self.labels.get(frame.name)
-        return entry is not None and key in entry.labels
-
     def _disagrees(self, frame: Frame) -> bool:
         entry = self.labels.get(frame.name)
         if entry is None:
