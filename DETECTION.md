@@ -2,7 +2,7 @@
 
 What each verdict measures, against what, and at which threshold.
 
-`CLAUDE.md` holds the approaches already tried and rejected, and how to
+`.claude/CLAUDE.md` holds the approaches already tried and rejected, and how to
 work in this repository. Nothing here is repeated there.
 
 ---
@@ -214,7 +214,7 @@ than by eye, the excess is about 3 counts against a per-pixel scatter of
 wrong directions through the same point score higher. Counting pixels
 above a lowered bar, integrating along the line, and doing so after
 removing the row and column medians all give the same answer — see the
-rejected-approaches table in `CLAUDE.md` for the numbers. Do not re-run
+rejected-approaches table in `.claude/CLAUDE.md` for the numbers. Do not re-run
 these.
 
 ---
@@ -250,7 +250,7 @@ both measured on those 59 frames:
   in the frame. The rule "three fragments and a straight line" was
   calibrated on a 2° field; a 33° field holds ten times the specks and
   three collinear ones are certain. The chance-alignment statistic
-  recorded in `CLAUDE.md` as sound but useless on narrow fields is what
+  recorded in `.claude/CLAUDE.md` as sound but useless on narrow fields is what
   separates this regime. A coverage floor does not: the confirmed
   satellite `051837` also sits at 2%.
 

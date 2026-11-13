@@ -838,12 +838,12 @@ That is the same rule as before, with `JPG/` generalised -- keep it.
 
 - The owner develops on more than one Windows machine, so nothing here
   should assume a particular core count, clock or interpreter path.
-- Python comes from a WinPython install, at the time of writing
-  `C:\WPy64-31350\python\python.exe` (Python 3.13, astropy 6.1). The
+- Use the `.venv` that `setup.bat` creates: `.venv\Scripts\python.exe`.
+  The owner also has a WinPython install (look for `C:\WPy64-*`), but the
   `python` on PATH usually does **not** have astropy — check before
-  concluding the code is broken. A `.venv` made by `setup.bat` gets the
-  latest releases instead (numpy 2.5, astropy 8 when this was written);
-  a session's `report.csv` came out byte-identical under both.
+  concluding the code is broken. A session's `report.csv` came out
+  byte-identical under WinPython (numpy 2.x, astropy 6.1) and the venv
+  (numpy 2.5, astropy 8).
 - Set `PYTHONIOENCODING=utf-8` when running from a console that is not
   already UTF-8.
 - Any helper script that uses multiprocessing needs an

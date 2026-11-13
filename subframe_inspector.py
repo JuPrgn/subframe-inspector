@@ -348,7 +348,7 @@ class Settings:
     # every worker holds a full-resolution frame and several working
     # copies, so a dozen of them at once can ask for two gigabytes. The
     # measurements do not change with the worker count -- only whether
-    # they all complete. See the note on parallelism in CLAUDE.md before
+    # they all complete. See the note on parallelism in .claude/CLAUDE.md before
     # capping it for speed, which is a different and mostly losing game.
     max_workers: int | None = None
 

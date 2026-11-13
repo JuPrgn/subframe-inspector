@@ -20,3 +20,6 @@ desktop.ini
 *.lnk
 subframe_inspector_settings.json
 subframe_inspector_errors.log
+
+# Claude Code: the project notes are shared, personal settings are not
+.claude/settings.local.json
