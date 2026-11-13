@@ -223,6 +223,19 @@ class Settings:
     # the wrong folder, which is why it ships anyway.
     meteor_taper: float = 2.0           # brighter half over dimmer half
     aircraft_brightness: float = 1.5    # x the session noise
+    # A meteor lasts a fraction of a second and an aircraft crosses the
+    # field in a few, so neither can leave the same line on two frames in
+    # a row. A satellite in a high orbit does: on M 45 one sat in eight
+    # consecutive frames, measured 3.16 wide on one of them and was filed
+    # as a meteor. A track found again on the previous or the next frame,
+    # at the same angle and on the same line, is therefore kept as a
+    # satellite whatever its width. Measured on that session: the same
+    # object on consecutive frames lies within 2.2 working px (16 arcsec)
+    # and 1.1 degrees of its own line; the nearest unrelated pair was
+    # 20 px off. The point is only to clear a false meteor, so it never
+    # removes an alert -- it decides which folder a track goes to.
+    track_recur_offset: float = 40.0    # arcsec, across the line
+    track_recur_tilt: float = 3.0       # degrees
 
     # -- Cloud and haze -------------------------------------------------
     # Three signatures, and the third one carries most of the recall.
@@ -510,6 +523,7 @@ class Thresholds:
     track_min_span: float
     track_cos_tilt: float          # cosine of the largest allowed tilt
     wide_track_width: float
+    track_recur_offset: float
     star_max_length: float
     shift_search_radius: float
     shift_vote_bin: float
@@ -533,6 +547,7 @@ class Thresholds:
             track_min_span=working(settings.track_min_span),
             track_cos_tilt=math.cos(math.radians(settings.track_max_tilt)),
             wide_track_width=working(settings.wide_track_width),
+            track_recur_offset=working(settings.track_recur_offset),
             star_max_length=working(settings.star_max_length),
             shift_search_radius=working(settings.shift_search_radius),
             shift_vote_bin=working(settings.shift_vote_bin),
@@ -1431,6 +1446,9 @@ class FrameStats:
     doubling: dict | None = None
     star_positions: np.ndarray = field(default_factory=lambda: np.zeros((0, 2)))
     field_shift: tuple[float, float, float] | None = None
+    # Set by mark_recurring_tracks: the same line is on a neighbouring
+    # frame, so the track cannot be a meteor or an aircraft.
+    track_recurs: bool = False
     segments: list[Segment] = field(default_factory=list)  # debug mode only
     # The same components under the wider export bars, kept only for
     # --export-cases so a replay can move the join bar downwards too.
@@ -1733,6 +1751,10 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
         is_tapered = shape.taper >= settings.meteor_taper
         is_bright = frame.noise > reference.noise * settings.aircraft_brightness
 
+        # Only a one-off track can be a meteor or an aircraft; see
+        # track_recur_offset.
+        is_wide = is_wide and not frame.track_recurs
+
         if is_wide and is_tapered:
             alerts.append(Alert(CATEGORY_METEORS,
                                 f"☄️ METEOR (wide and uneven: {geometry_note}, "
@@ -1744,8 +1766,11 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
                                 f"frame noise {frame.noise / reference.noise:.1f}x"
                                 f"){edge_note}"))
         else:
+            recur_note = (" · also on a neighbouring frame"
+                          if frame.track_recurs else "")
             alerts.append(Alert(CATEGORY_SATELLITES,
-                                f"🛰️ SATELLITE ({geometry_note}){edge_note}"))
+                                f"🛰️ SATELLITE ({geometry_note}){edge_note}"
+                                f"{recur_note}"))
 
     shift_dx, shift_dy, shift_confidence = frame.field_shift or (0.0, 0.0, 0.0)
     doubling = frame.doubling or {}
@@ -1772,6 +1797,7 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
         "track_width": round(frame.track.max_width, 2) if frame.track else 0.0,
         "track_fragments": frame.track.fragments if frame.track else 0,
         "track_tilt": round(frame.track.tilt, 1) if frame.track else 0.0,
+        "track_recurs": int(frame.track_recurs),
         "track_glow": round(profile.glow, 1),
         "track_peak": round(profile.peak, 1),
         "track_rms_width": round(profile.width, 2),
@@ -1786,6 +1812,38 @@ def classify_frame(frame: FrameStats, reference: SessionReference,
         "doubling_fraction": round(doubling.get("fraction", 0.0), 3),
     }
     return alerts, metrics
+
+
+def same_line(a: Track, b: Track, settings: Settings,
+              thresholds: Thresholds) -> bool:
+    """Whether two tracks lie on one line: same angle, no offset across it.
+
+    Not whether they overlap: a satellite moves along its own line, so on
+    the next frame it is further down the same line, not on top of where
+    it was.
+    """
+    turn = abs(a.tilt - b.tilt) % 180.0
+    if min(turn, 180.0 - turn) > settings.track_recur_tilt:
+        return False
+    dx, dy = b.centre_x - a.centre_x, b.centre_y - a.centre_y
+    across = max(abs(dx * a.unit_y - dy * a.unit_x),
+                 abs(dx * b.unit_y - dy * b.unit_x))
+    return across <= thresholds.track_recur_offset
+
+
+def mark_recurring_tracks(frames: Sequence[FrameStats], settings: Settings,
+                          thresholds: Thresholds) -> None:
+    """Flag every track found again on the frame before or after it.
+
+    The frames are in shooting order. Decision, not measurement: it reads
+    the tracks already found, so a replay runs it too, after refitting.
+    """
+    for index, frame in enumerate(frames):
+        frame.track_recurs = frame.track is not None and any(
+            other.track is not None
+            and same_line(frame.track, other.track, settings, thresholds)
+            for other in frames[max(0, index - 1):index + 2]
+            if other is not frame)
 
 
 def _measure_shifts(frames: Sequence[FrameStats], thresholds: Thresholds) -> None:
@@ -1868,6 +1926,7 @@ def classify_session(frames_folder: str | Session, mode: str | None = "copy",
 
     elapsed = time.time() - started
     _measure_shifts(frames, thresholds)
+    mark_recurring_tracks(frames, settings, thresholds)
     reference = SessionReference.of(frames)
 
     print("\n" + "=" * 60)

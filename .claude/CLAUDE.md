@@ -292,8 +292,11 @@ same session holds a slow satellite that measures 3.16 on one frame and
 was filed as a meteor. So width does not separate them there, and two
 examples are no reason to move the threshold. What the owner actually
 recognised them by was a **green glow along one side of the trail**, and
-a single-frame track; a satellite recurring at the same tilt on
-consecutive frames is the cue that would have cleared the false one.
+a single-frame track. A track recurring on the same line on a
+neighbouring frame is now kept as a satellite (`mark_recurring_tracks`),
+which cleared the false one and changed nothing else on 1785 replayed
+frames. It is a decision, not a measurement: a replay runs it after
+refitting every track, so the two must stay in that order.
 Details and numbers in `DETECTION.md`, under "First confirmed meteors".
 Do not tune `wide_track_width` on these two.
 The owner reports the old aircraft rule firing correctly on a sub of

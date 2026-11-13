@@ -48,9 +48,10 @@ from typing import Sequence
 from subframe_inspector import (  # noqa: E402 -- grouped on purpose
     CATEGORY_CLOUDS, CATEGORY_METEORS, CATEGORY_SATELLITES, CATEGORY_TRAILING,
     CATEGORY_AIRCRAFT, DEFAULT_SETTINGS, MEASUREMENT_SETTINGS, FrameStats,
-    MEASUREMENT_PARTS, SessionReference,
+    MEASUREMENT_PARTS,
     Settings, Thresholds, cases_session, classify_frame, find_star_doubling,
-    find_sub_folders, find_track, measurement_fingerprint,
+    find_sub_folders, find_track, mark_recurring_tracks,
+    measurement_fingerprint,
     measurement_fingerprints, read_cases, read_frame_labels, session_label,
     select_track_segments,
 )
@@ -201,10 +202,9 @@ def check_segment_floor(bundle: dict, settings: Settings,
             f"Raise export_segment_length_factor and re-export.")
 
 
-def replay_frame(frame: FrameStats, reference: SessionReference,
-                 settings: Settings, thresholds: Thresholds,
-                 refit: bool, revote: bool) -> tuple[list[str], bool]:
-    """Re-decide one frame. Returns its categories and whether the profile held.
+def refit_frame(frame: FrameStats, settings: Settings, thresholds: Thresholds,
+                refit: bool, revote: bool) -> bool:
+    """Re-run what can be re-run on one frame. Returns whether the profile held.
 
     The track search is re-run from the exported fragments and the
     doubling vote from the exported blobs, so that the settings behind
@@ -235,9 +235,7 @@ def replay_frame(frame: FrameStats, reference: SessionReference,
         elif found is not None:
             profile_held = False
         frame.track = found
-
-    alerts, _ = classify_frame(frame, reference, settings, thresholds)
-    return [alert.category for alert in alerts], profile_held
+    return profile_held
 
 
 def replay_bundle(path: str, overrides: dict, refit: bool, stale_ok: bool,
@@ -274,10 +272,15 @@ def replay_bundle(path: str, overrides: dict, refit: bool, stale_ok: bool,
     # The target when the bundle carries one -- it is only a label, but
     # a list of changed frames reads better with the night named.
     session = bundle["session"].get("target") or bundle["session"]["id"]
+    # Every track is refitted before any frame is judged: whether a track
+    # recurs on the next frame is part of the verdict, as in the real run.
+    held = [refit_frame(frame, settings, thresholds, refit, revote)
+            for frame in frames]
+    mark_recurring_tracks(frames, settings, thresholds)
     results = []
-    for frame, case in zip(frames, bundle["frames"]):
-        categories, profile_held = replay_frame(frame, reference, settings,
-                                                thresholds, refit, revote)
+    for frame, case, profile_held in zip(frames, bundle["frames"], held):
+        alerts, _ = classify_frame(frame, reference, settings, thresholds)
+        categories = [alert.category for alert in alerts]
         fresher = (labels or {}).get(case["id"])
         results.append(Replayed(
             session=session,

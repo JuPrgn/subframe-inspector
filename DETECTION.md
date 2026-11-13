@@ -193,6 +193,7 @@ Over 26 confirmed satellites:
 | wide enough to leave the satellite branch | `wide_track_width` | 18 arcsec (~2.4 working px) |
 | tapered → meteor | `meteor_taper` | 2.0 |
 | evenly lit and bright → aircraft | `aircraft_brightness` | 1.5 x session noise |
+| same line on a neighbouring frame → satellite, whatever the width | `track_recur_offset`, `track_recur_tilt` | 40 arcsec, 3° |
 
 Use the flux-weighted width, not the geometric extent: outlying pixels
 put the widest satellites at 7.6 working px on that measure. Do not
@@ -241,13 +242,27 @@ them, 3.16 on `040651`, which `taper` 4.56 then filed under **Meteors**.
 into a short track is the likeliest cause, as with the profile.
 
 So on this session the width separates nothing, and two examples are no
-basis for moving `wide_track_width`. Two leads, neither measured yet:
+basis for moving `wide_track_width`.
 
-- **Persistence.** A track at the same tilt and span on neighbouring
-  frames is a satellite. That is physical — a meteor lasts a fraction of
-  a second — and it would have cleared `040651`. It needs the track's
-  position as well as its tilt to be safe on a field crossed by several
-  satellites.
+**Persistence, now in place.** A meteor lasts a fraction of a second and
+an aircraft crosses the field in a few, so neither can leave the same
+line on two consecutive frames; a satellite in a high orbit does.
+`mark_recurring_tracks` compares each track with the one on the frame
+before and after: same angle within `track_recur_tilt`, and each centre
+within `track_recur_offset` of the other's line. Not overlap — the
+satellite has moved on along its own line.
+
+Measured on the `M 45` bundle, over every pair of consecutive frames
+that both hold a track: the same object lies within **2.2 working px**
+and **1.1°** of its own line; the nearest unrelated pair is 20 px off,
+the rest 62 px and beyond. 40 arcsec is 5.3 working px, between the two.
+Replayed on all 1486 frames it changes exactly one verdict, `040651`,
+Meteors → Satellites; on `LBN 550_IRCUT_20260909` it changes nothing.
+It never adds or removes an alert, only picks the folder. Both confirmed
+meteors are on a frame alone and are untouched by it.
+
+One lead left, not measured yet:
+
 - **Colour.** The green is the strongest single cue the eye used. The
   detector measures the raw Bayer mosaic, which does keep the green
   photosites apart, so a green excess along the track is measurable in

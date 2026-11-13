@@ -624,6 +624,54 @@ class TestClassification(unittest.TestCase):
                               width=self.th.wide_track_width * 2, taper=4.0))
         self.assertIn(si.CATEGORY_METEORS, self.categories(self.frame(track=wide)))
 
+    # -- a track that comes back on the next frame ----------------------
+
+    def wide_tapered(self, **where):
+        width = self.th.wide_track_width * 2
+        return si.replace(self.track(width=width),
+                          profile=si.TrackProfile(width=width, taper=4.0),
+                          **where)
+
+    def mark(self, *frames):
+        si.mark_recurring_tracks(list(frames), S, self.th)
+
+    def test_a_meteor_seen_again_on_the_next_frame_is_a_satellite(self):
+        """A slow satellite on M 45 measured 3.16 px on one frame of eight."""
+        meteor = self.frame(track=self.wide_tapered())
+        after = self.frame(track=self.wide_tapered(centre_x=700.0))
+        self.mark(meteor, after)
+        self.assertEqual(self.categories(meteor), {si.CATEGORY_SATELLITES})
+
+    def test_a_meteor_alone_stays_a_meteor(self):
+        meteor = self.frame(track=self.wide_tapered())
+        self.mark(self.frame(), meteor, self.frame())
+        self.assertIn(si.CATEGORY_METEORS, self.categories(meteor))
+
+    def test_a_parallel_track_elsewhere_is_not_the_same_line(self):
+        meteor = self.frame(track=self.wide_tapered())
+        beside = self.frame(track=self.wide_tapered(centre_y=600.0))
+        self.mark(meteor, beside)
+        self.assertIn(si.CATEGORY_METEORS, self.categories(meteor))
+
+    def test_a_crossing_track_is_not_the_same_line(self):
+        meteor = self.frame(track=self.wide_tapered())
+        crossing = self.frame(track=self.wide_tapered(tilt=120.0, unit_x=0.0,
+                                                      unit_y=1.0))
+        self.mark(meteor, crossing)
+        self.assertIn(si.CATEGORY_METEORS, self.categories(meteor))
+
+    def test_only_neighbours_count(self):
+        meteor = self.frame(track=self.wide_tapered())
+        later = self.frame(track=self.wide_tapered(centre_x=900.0))
+        self.mark(meteor, self.frame(), later)
+        self.assertFalse(meteor.track_recurs)
+
+    def test_recurrence_never_removes_a_track(self):
+        satellite = self.frame(track=self.track())
+        self.mark(satellite,
+                  self.frame(track=si.replace(self.track(), centre_x=700.0)))
+        self.assertEqual(self.categories(satellite), {si.CATEGORY_SATELLITES})
+
     # -- haze ------------------------------------------------------------
 
     def test_a_raised_background_is_haze(self):

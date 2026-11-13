@@ -356,6 +356,7 @@ exist:
 | `stars`, `elongation`, `elongation_ratio` | the trailing verdict |
 | `star_radius`, `radius_ratio`, `coherence` | star size, and whether they all lean one way |
 | `track_span`, `track_coverage`, `track_fragments`, `track_tilt`, `track_width` | the track's geometry |
+| `track_recurs` | 1 when the same line is on the previous or next frame: a slow satellite, never a meteor |
 | `track_rms_width`, `track_glow`, `track_peak` | its flux-weighted width, and its brightness per unit length and at its brightest, in units of the frame noise |
 | `head_ratio`, `head_position`, `taper` | how the light sits along it |
 | `shift_px`, `shift_dx`, `shift_dy`, `shift_confidence` | the field shift |
@@ -401,7 +402,9 @@ answer to the question.
 
 - **Meteors usually end up in Satellites.** The first two meteors
   confirmed in this data were thinner than the meteor gate and were filed
-  as satellites, while a slow satellite was once filed as a meteor. What
+  as satellites. A slow satellite was once filed as a meteor; a track
+  that comes back on the same line on the next frame is now always kept
+  as a satellite. What
   gives a meteor away on the preview is a green glow along one side of the
   trail, on a single frame; check the Satellites folder for it, and tick
   what you find as Meteor in the labeller. No aircraft has been confirmed
