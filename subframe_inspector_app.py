@@ -394,7 +394,7 @@ class Inspector:
     def label(self) -> None:
         chosen = self.browser.selected()
         if chosen:
-            launch_tool("label_frames.py", chosen[0].root)
+            launch_tool("subframe_labeller.py", chosen[0].root)
 
     def delete(self) -> None:
         chosen = self.browser.selected()

@@ -455,7 +455,7 @@ def find_source(folder: str, frame_id: str) -> tuple[str, str] | None:
 
     A session does not always keep its ``JPG/`` folder, and skipping
     those frames would quietly collect nothing at all from a whole night.
-    The FITS is always there, and label_frames already knows how to
+    The FITS is always there, and subframe_labeller already knows how to
     stretch one for the eye -- so that renderer is reused rather than
     written a second time.
     """
@@ -495,7 +495,7 @@ def make_preview(folder: str, frame_id: str, destination: str,
         # A Seestar frame is a Bayer mosaic, so this carries a fine
         # checkerboard the JPG does not. Star shapes and trails read the
         # same, which is what these pictures are for.
-        from label_frames import read_fits
+        from subframe_labeller import read_fits
         image = read_fits(source)
     if image.width > width:
         height = round(image.height * width / image.width)

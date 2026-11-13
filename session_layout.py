@@ -56,6 +56,10 @@ FRAME_EXTENSIONS = (".fit", ".fits", ".jpg", ".jpeg")
 
 CONFIG_FILENAME = "subframe_inspector_settings.json"
 
+# The two programs, as their windows and shortcuts name them.
+APP_NAME = "Subframe Inspector"
+LABELLER_NAME = "Subframe Labeller"
+
 
 def frame_stem(filename: str) -> str:
     """A file name without the extensions in play here.

@@ -538,8 +538,8 @@ double-click a night — or straight on one session from the inspector's
 *Label / view frames…* button. From a terminal:
 
 ```
-python label_frames.py "LBN 550_sub"
-python label_frames.py                  # opens the session list
+python subframe_labeller.py "LBN 550_sub"
+python subframe_labeller.py                  # opens the session list
 ```
 
 It shows the previews one at a time, in the order they were shot, with

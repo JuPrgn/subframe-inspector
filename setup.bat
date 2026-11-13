@@ -56,7 +56,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$targets = @($here);" ^
   "if ('%DESKTOP%' -eq '1') { $targets += [Environment]::GetFolderPath('Desktop') };" ^
   "foreach ($folder in $targets) {" ^
-  "  foreach ($tool in @(@('Subframe Inspector', 'inspector_app.py'), @('Subframe Labeller', 'label_frames.py'))) {" ^
+  "  foreach ($tool in @(@('Subframe Inspector', 'subframe_inspector_app.py'), @('Subframe Labeller', 'subframe_labeller.py'))) {" ^
   "    $link = $shell.CreateShortcut((Join-Path $folder ($tool[0] + '.lnk')));" ^
   "    $link.TargetPath = $pyw;" ^
   "    $link.Arguments = '\"' + (Join-Path $here $tool[1]) + '\"';" ^

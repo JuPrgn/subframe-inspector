@@ -18,8 +18,8 @@ so the two cannot drift apart. That also keeps the dependencies down to
 tkinter and Pillow -- no numpy, no astropy -- so it runs on whatever
 interpreter happens to be on PATH.
 
-    python label_frames.py "LBN 550_sub"
-    python label_frames.py                # asks which session
+    python subframe_labeller.py "LBN 550_sub"
+    python subframe_labeller.py                # opens the session list
 """
 
 from __future__ import annotations
@@ -33,8 +33,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from session_layout import (configured_layout, load_config, resolve,
-                            session_root)
+from session_layout import (LABELLER_NAME, configured_layout, load_config,
+                            resolve, session_root)
 
 # The console output uses emoji. On a Windows console still running
 # cp1252 the very first print would abort with UnicodeEncodeError.
@@ -531,7 +531,7 @@ class Labeller:
         import tkinter as tk
 
         self.master.configure(bg=BACKGROUND)
-        self.master.title(f"Frame labelling — {os.path.basename(self.session)}")
+        self.master.title(f"{LABELLER_NAME} — {os.path.basename(self.session)}")
         self.master.geometry("1560x980")
 
         top = tk.Frame(self.master, bg=PANEL, padx=10, pady=6)
@@ -1670,9 +1670,9 @@ def choose_session() -> str | None:
 
     chosen: list[str] = []
     root = tk.Tk()
-    root.title("Frame labelling — choose a session")
+    root.title(f"{LABELLER_NAME} — choose a session")
     root.geometry("900x560")
-    install_error_hooks(root)
+    install_error_hooks(root, LABELLER_NAME)
     config = load_config()
 
     def pick(session) -> None:
@@ -1701,7 +1701,7 @@ def show_problem(message: str) -> None:
         from tkinter import messagebox
         root = tk.Tk()
         root.withdraw()
-        messagebox.showwarning("Frame labelling", message, parent=root)
+        messagebox.showwarning(LABELLER_NAME, message, parent=root)
         root.destroy()
     except Exception:  # no display at all: the print above is all there is
         pass
@@ -1758,7 +1758,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from session_browser import install_error_hooks
     root = tk.Tk()
-    install_error_hooks(root)
+    install_error_hooks(root, LABELLER_NAME)
     Labeller(root, folder, frames, labels_path, labels)
     root.mainloop()
 

@@ -26,12 +26,11 @@ from collections.abc import Callable
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from session_layout import (DEFAULT_LAYOUT, Layout, Session,
+from session_layout import (APP_NAME, DEFAULT_LAYOUT, Layout, Session,
                             configured_layout, find_sessions,
                             remember_folder, resolve, save_config,
                             session_root)
 
-APP_NAME = "Subframe Inspector"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -43,7 +42,7 @@ def log_path() -> str:
     return os.path.join(HERE, "subframe_inspector_errors.log")
 
 
-def install_error_hooks(root: tk.Tk) -> None:
+def install_error_hooks(root: tk.Tk, title: str = APP_NAME) -> None:
     """Make an exception visible when there is no console to print it.
 
     Launched through pythonw, a traceback goes nowhere and the window
@@ -58,7 +57,7 @@ def install_error_hooks(root: tk.Tk) -> None:
         except OSError:
             pass
         try:
-            messagebox.showerror(APP_NAME, f"{value}\n\nDetails written to:\n"
+            messagebox.showerror(title, f"{value}\n\nDetails written to:\n"
                                            f"{log_path()}", parent=root)
         except tk.TclError:
             pass
@@ -139,7 +138,7 @@ class LayoutDialog:
         layout = configured_layout(config)
 
         self.window = tk.Toplevel(parent)
-        self.window.title("Folder layout")
+        self.window.title(f"Folder layout — {APP_NAME}")
         self.window.transient(parent)
         self.window.grab_set()
         frame = ttk.Frame(self.window, padding=12)

@@ -2807,7 +2807,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         epilog="The folder may be a session or a folder holding several; "
                "with several -- or none given, which searches the current "
                "folder -- they are offered as a numbered list. For a window "
-               "instead of this, run inspector_app.pyw.")
+               "instead of this, run subframe_inspector_app.py.")
     parser.add_argument("folder", nargs="?",
                         help="a session folder, or a folder holding sessions")
     parser.add_argument("--mode", choices=("copy", "move", "report", "none"),

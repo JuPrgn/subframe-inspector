@@ -449,7 +449,7 @@ is where the old detector's false positives lived.
 
 ### `<session>/labels.csv` — the growing set
 
-`label_frames.py` writes one there per session, and it supersedes the
+`subframe_labeller.py` writes one there per session, and it supersedes the
 lists above wherever the two overlap: those were noted in passing, this
 one is a frame gone through deliberately. Columns: `frame`, `labels`
 (what the owner saw, space-separated), `note` (free text), `detected`
@@ -499,7 +499,7 @@ The vocabulary is the detector's own plus `Clean`. A `Doubling` button
 existed briefly and was removed on the owner's ruling -- *"c'est du
 trailing"* -- having never been ticked once in 648 labelled frames. Both
 readers keep the alias anyway (`LABEL_ALIASES` in `replay_cases.py`,
-`LABEL_TO_DETECTOR` in `label_frames.py`), so a file written while it
+`LABEL_TO_DETECTOR` in `subframe_labeller.py`), so a file written while it
 existed still counts as agreeing with a `Trailing` verdict. Do not add
 the button back without asking: the distinction is real, but it belongs
 to `doubling_px` in the CSV, not to the labels.
@@ -667,7 +667,7 @@ the only solid negative evidence in the corpus.
 
 It does not need `JPG/`. A session does not always keep its previews, so
 a frame without one is rendered from the FITS through
-``label_frames.read_fits`` -- the same stretch, not a second copy of it.
+``subframe_labeller.read_fits`` -- the same stretch, not a second copy of it.
 What comes out is a Bayer mosaic and carries a checkerboard the JPG does
 not; star shapes and trails read the same.
 
@@ -794,9 +794,9 @@ your own work, since the previews line up with the FITS pixel for pixel.
 | --- | --- |
 | `subframe_inspector.py` | the detector, and its command line. Every measurement and every verdict lives here |
 | `session_layout.py` | where a session's frames and previews are: relative patterns, tried from the session folder, plus the saved preferences. Standard library only, because the labeller must run without numpy |
-| `inspector_app.py` | the analysis window. Calls `classify_session` exactly as `main()` does, with stdout redirected into its log pane; decides nothing itself |
+| `subframe_inspector_app.py` | the analysis window. Calls `classify_session` exactly as `main()` does, with stdout redirected into its log pane; decides nothing itself |
 | `session_browser.py` | the session list both windows open on, the layout dialog, and the error hooks that make a traceback visible under pythonw |
-| `label_frames.py` | the labelling window: frames one at a time with a close-up beside them, recording what the eye saw into `<session>/labels.csv`. Filters both halves -- what the detector flagged and what the owner ticked, `Clean for me` included, which is the view to point them at when the corpus needs solid negatives. Shows the JPG preview, the `REVIEW/` copy or the FITS itself, so a session with no previews still works. Reads `report.csv` rather than re-deriving any verdict; tkinter + Pillow, with numpy/astropy needed only for the FITS source |
+| `subframe_labeller.py` | the labelling window: frames one at a time with a close-up beside them, recording what the eye saw into `<session>/labels.csv`. Filters both halves -- what the detector flagged and what the owner ticked, `Clean for me` included, which is the view to point them at when the corpus needs solid negatives. Shows the JPG preview, the `REVIEW/` copy or the FITS itself, so a session with no previews still works. Reads `report.csv` rather than re-deriving any verdict; tkinter + Pillow, with numpy/astropy needed only for the FITS source |
 | `setup.bat` | one-time install for other users: a `.venv` beside the tools, and two `.lnk` shortcuts that start the windows through `pythonw` |
 | `DETECTION.md` | the specification behind every verdict: hypothesis, quantity, reference, number, and the measurement justifying it, per category -- plus the blind spots each one has |
 | `test_subframe_inspector.py` | stdlib `unittest`, no fixtures on disk, about a second |
