@@ -143,7 +143,7 @@ is filed under each of them.
 | `--mode move` | move them out of their folder |
 | `--mode report` | write the two reports and nothing else |
 | `--debug` | draw on the previews as they are filed, showing what triggered each alert |
-| `--trailing RATIO` | how oval the stars must be to count as trailed (default 1.30) |
+| `--trailing RATIO` | how oval the stars must be to count as trailed (default 1.25) |
 | `--export-cases` | also write a case bundle: every measurement, none of the pixels — see below |
 | `--workers N` | cap the worker processes. Lower it if a run reports frames it could not read for want of memory; it changes no measurement |
 | `--delete-flagged` | delete the `.fit` files of flagged frames — irreversible, see below |
@@ -657,7 +657,7 @@ classify_session("LBN 550_sub", mode="copy", settings=settings)
 
 The ones you are most likely to move:
 
-- **`trailing_elongation_ratio`** (1.30) — how oval the stars must be,
+- **`trailing_elongation_ratio`** (1.25) — how oval the stars must be,
   against the sharpest quarter of the session, to count as trailed. 1.20
   is strict, 1.45 catches only obvious ovals. Also on the command line,
   as `--trailing`.
