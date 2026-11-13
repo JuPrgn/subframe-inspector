@@ -1,0 +1,8 @@
+# The tool itself.
+numpy>=1.24
+scipy>=1.10
+astropy>=5.0
+
+# Only for --debug, which draws on the previews. Everything else runs
+# without it, and the run says so rather than failing if it is missing.
+pillow>=9.0
