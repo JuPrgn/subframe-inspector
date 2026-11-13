@@ -77,11 +77,11 @@ TRACK_FAMILY = (CATEGORY_SATELLITES, CATEGORY_METEORS, CATEGORY_AIRCRAFT)
 
 SCORED = (CATEGORY_TRAILING, CATEGORY_SATELLITES, CATEGORY_CLOUDS)
 
-# Re-running the pairwise vote costs about 175 ms a frame -- nothing in
-# the tool itself, where it is spread over a pool of workers, but a
-# minute of a corpus replay that is otherwise instant. So it is only
-# re-run when one of its own settings has moved; otherwise the exported
-# answer is already the answer these settings give.
+# The pairwise vote is only re-run when one of its own settings has
+# moved; otherwise the exported answer is already the answer these
+# settings give. It used to cost 175 ms a frame, a minute of an
+# otherwise instant replay; since the vote went through a KD-tree it is
+# about 3 ms, but there is still no reason to redo what did not change.
 DOUBLING_SETTINGS = tuple(f.name for f in fields(Settings)
                           if f.name.startswith("doubling"))
 

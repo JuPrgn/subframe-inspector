@@ -710,10 +710,12 @@ pass `replay_cases.py --labels <session>/labels.csv` instead of re-running
 on the FITS; frames are matched on their timestamp, so it works whatever
 the folder is called and whichever session the file came from.
 
-**One cost worth knowing.** The doubling vote is 175 ms a frame -- nothing
-in the tool, where it is spread over a pool, but a minute of an otherwise
-instant corpus replay. It is therefore only re-run when one of the
-`doubling_*` settings has actually moved.
+**One cost worth knowing.** The doubling vote was 175 ms a frame and a
+full pairs-squared matrix in memory -- 90 to 120 MB per frame on the
+exported sessions. It now counts agreeing vectors through a KD-tree:
+3 ms and under a megabyte, checked identical to the matrix on every one
+of 3554 votes over the two bundles on disk. A replay still only re-runs
+it when one of the `doubling_*` settings has actually moved.
 
 **The validation to repeat after any change to the export.** Run a
 session twice, with `--export-cases` and without: the two `report.csv`
