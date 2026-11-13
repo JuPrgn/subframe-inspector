@@ -25,7 +25,6 @@ A tuning aid; delete it once the thresholds have settled.
 
 from __future__ import annotations
 
-import glob
 import os
 import sys
 import time
@@ -34,6 +33,7 @@ from dataclasses import replace
 import numpy as np
 
 import subframe_inspector as triage
+from session_layout import configured_layout, resolve, session_root
 
 
 def stars_in(frame: np.ndarray, settings: triage.Settings,
@@ -69,14 +69,23 @@ def main() -> int:
     wanted = int(sys.argv[2]) if len(sys.argv) > 2 else 12
     settings = triage.DEFAULT_SETTINGS
 
-    paths = sorted(glob.glob(os.path.join(folder, "*.fit*")))
+    # The same layout the tools use, so a session keeping its subs in
+    # Lights/ -- or anywhere the user configured -- is found, and a stack
+    # left beside them is not taken for one.
+    layout = configured_layout()
+    paths = resolve(session_root(folder, layout), layout).frames
     if not paths:
-        print(f"No FITS files in '{folder}'.")
+        print(f"No light frames in '{folder}' (looked for {layout.describe()}).")
         return 1
 
     # The thresholds are quoted in arcseconds and only become pixels once
     # the camera is known, so they come from the frames themselves.
     geometry = triage.Geometry.of(paths[0], settings)
+    refusal = triage.unsupported_scale(geometry, settings)
+    if refusal is not None:
+        print(f"'{folder}' is outside what the detector can judge, so there "
+              f"is nothing to calibrate against.\n   {refusal}")
+        return 1
     thresholds = triage.Thresholds.derive(settings, geometry)
 
     print(f"{len(paths)} frames in '{folder}', {wanted} analysed")
