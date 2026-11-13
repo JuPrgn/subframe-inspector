@@ -459,8 +459,15 @@ class Geometry:
         """Read one frame's header and derive the session's geometry."""
         with fits.open(path, memmap=False) as hdu_list:
             header = hdu_list[0].header
-            shape = next((h.data.shape for h in hdu_list if h.data is not None),
-                         (header.get("NAXIS2", 0), header.get("NAXIS1", 0)))
+            # The shape from the headers, never from .data: touching the
+            # data reads and rescales a whole plane just to learn its size.
+            shape: tuple[int, ...] = (0, 0)
+            for hdu in hdu_list:
+                axes = int(hdu.header.get("NAXIS", 0) or 0)
+                if axes >= 2:
+                    shape = tuple(int(hdu.header.get(f"NAXIS{i}", 0) or 0)
+                                  for i in range(axes, 0, -1))
+                    break
         return cls.from_header(header, shape, settings)
 
     @classmethod
