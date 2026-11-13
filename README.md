@@ -90,10 +90,14 @@ M 45_sub/                       M 45_sub/
 ```
 
 — and anything in between: frames at the root or in `Lights/`, previews
-in `JPG/`, `Lights_JPG/`, `Lights/` or beside the frames. The Seestar's
-own `Stacked_*` results and `*_thn.jpg` thumbnails are ignored, and when
-the subs are in `Lights/`, a stack you left at the root is not mistaken
-for one. Picking the `Lights/` folder itself works too: the session is
+in `JPG/`, `Lights_JPG/`, `Lights/` or beside the frames. Stacked
+results are never taken for subs: by their name (`Stacked_*`,
+`Video_Stacked_*`, anything with *stack* in it, or the `301x60sec` form),
+or, when the name gives nothing away, by their FITS header — a stack
+records how many frames went into it and is a colour image, where a sub
+is a raw mosaic. `*_thn.jpg` thumbnails are ignored too, and when the
+subs are in `Lights/`, a stack you left at the root is not mistaken for
+one. Picking the `Lights/` folder itself works too: the session is
 the folder above it. `REVIEW/` and `labels.csv` are always written in the
 session folder.
 

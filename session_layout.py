@@ -30,6 +30,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 from dataclasses import dataclass, field
 
 # Tried in order for the frames, all of them for the previews. Matching is
@@ -38,9 +39,12 @@ DEFAULT_FRAME_PATTERNS = ("Lights/*.fit*", "*.fit*")
 DEFAULT_PREVIEW_PATTERNS = ("JPG/*.jpg", "JPG/*.jpeg", "Lights_JPG/*.jpg",
                             "Lights/*.jpg", "*.jpg", "*.jpeg")
 
-# Never a sub: the Seestar's own stacks and thumbnails, and anything the
-# tools filed themselves.
-EXCLUDED_NAMES = ("stacked_*", "*_thn.*")
+# Never a sub: thumbnails, and stacks recognisable by their name -- the
+# Seestar's 'Stacked_...' and 'Video_Stacked_...', anything else calling
+# itself a stack, and the '<N>x<exposure>sec' a stacked result is usually
+# named after ('SH2-132_301x60sec_T21degC_...').
+EXCLUDED_NAMES = ("*_thn.*", "*stack*")
+STACK_NAME = re.compile(r"\d+\s*x\s*\d+(?:\.\d+)?\s*s(?:ec)?(?![a-z])", re.IGNORECASE)
 TOOL_FOLDERS = ("review",)
 
 # Folders a session search never descends into: they are part of a
@@ -118,7 +122,70 @@ def _listdir(folder: str) -> list[str]:
 
 def _excluded(name: str) -> bool:
     lowered = name.lower()
-    return any(fnmatch.fnmatchcase(lowered, p) for p in EXCLUDED_NAMES)
+    return (any(fnmatch.fnmatchcase(lowered, p) for p in EXCLUDED_NAMES)
+            or bool(STACK_NAME.search(frame_stem(name))))
+
+
+def read_fits_header(path: str, limit: int = 36) -> dict[str, str]:
+    """The primary header's cards, without astropy.
+
+    A header is 2880-byte blocks of 80-character cards ending at 'END';
+    reading it by hand keeps this module free of numpy, and costs one
+    small read per file.
+    """
+    cards: dict[str, str] = {}
+    try:
+        with open(path, "rb") as handle:
+            for _ in range(limit):
+                block = handle.read(2880)
+                if len(block) < 2880:
+                    break
+                for start in range(0, 2880, 80):
+                    card = block[start:start + 80].decode("ascii", "replace")
+                    key = card[:8].strip()
+                    if key == "END":
+                        return cards
+                    if card[8:10] == "= ":
+                        value = card[10:].split("/", 1)[0].strip().strip("'").strip()
+                        cards.setdefault(key, value)
+    except OSError:
+        pass
+    return cards
+
+
+def is_stacked(path: str) -> bool:
+    """Whether a FITS is a stacked result rather than one sub.
+
+    For a stack whose name gives nothing away -- a Seestar stack renamed
+    to its timestamp looks exactly like a sub. The header does not lie:
+    a stack counts what went into it (STACKCNT, NCOMBINE), and it is a
+    debayered colour image, where a sub is a raw two-dimensional mosaic.
+    """
+    header = read_fits_header(path)
+
+    def number(key: str) -> float:
+        try:
+            return float(header.get(key, "0") or 0)
+        except ValueError:
+            return 0.0
+
+    return (number("STACKCNT") > 1 or number("NCOMBINE") > 1
+            or number("NAXIS") >= 3)
+
+
+def drop_stacks(frames: list[str]) -> list[str]:
+    """Remove the stacks a name did not give away.
+
+    Reading every header of a thousand-frame night would slow the search
+    over a whole drive for nothing: a folder of subs does not hide a
+    stack among them. So the first and last frames are checked, and only
+    when one of them turns out to be a stack is the whole list read.
+    """
+    if not frames:
+        return frames
+    if not (is_stacked(frames[0]) or is_stacked(frames[-1])):
+        return frames
+    return [path for path in frames if not is_stacked(path)]
 
 
 def match_pattern(root: str, pattern: str) -> list[str]:
@@ -160,8 +227,8 @@ def resolve(root: str, layout: Layout = DEFAULT_LAYOUT) -> Session:
     root = os.path.abspath(root)
     session = Session(root=root)
     for pattern in layout.frames:
-        frames = [p for p in match_pattern(root, pattern)
-                  if p.lower().endswith((".fit", ".fits"))]
+        frames = drop_stacks([p for p in match_pattern(root, pattern)
+                              if p.lower().endswith((".fit", ".fits"))])
         if frames:
             session.frames = frames
             session.frame_pattern = pattern

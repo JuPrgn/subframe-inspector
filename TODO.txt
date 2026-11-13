@@ -1,3 +1,0 @@
-label : ajouter clean for me
-Plein de nuages pas détectés sur LBN 550_260901_sub et des trailing
-MW tout détecté en satellites

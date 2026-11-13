@@ -1160,6 +1160,33 @@ class TestSessionLayout(unittest.TestCase):
         self.assertEqual(len(session.frames), 1)
         self.assertEqual(session.previews, {})
 
+    def test_stacks_are_recognised_by_name(self):
+        self.touch(f"{self.NAME}.fit")
+        for name in ("Video_Stacked_Lunar_20260726-232815.fit",
+                     "NGC7635_stack_d3x_S50_140h.fit",
+                     "SH2-132_301x60sec_T21degC_2026-09-19.fit",
+                     "LP_NGC_7635_1019x30sec_T26degC_2026-08-18.fit"):
+            self.touch(name)
+        self.assertEqual(len(sl.resolve(self.root).frames), 1)
+
+    def write_fits(self, relative: str, cards: dict) -> str:
+        path = self.touch(relative)
+        header = "".join(f"{k:<8}= {v:>20}".ljust(80) for k, v in cards.items())
+        header += "END".ljust(80)
+        with open(path, "wb") as handle:
+            handle.write(header.ljust(2880).encode("ascii"))
+        return path
+
+    def test_a_stack_named_like_a_sub_is_read_from_its_header(self):
+        """A Seestar stack renamed to its timestamp looks exactly like a sub."""
+        for stamp in ("20260829-032001", "20260914-223949"):
+            self.write_fits(f"{stamp}.fit", {"NAXIS": 3, "STACKCNT": 946})
+        self.assertEqual(sl.resolve(self.root).frames, [])
+
+    def test_a_sub_header_is_not_a_stack(self):
+        path = self.write_fits(f"{self.NAME}.fit", {"NAXIS": 2, "EXPTIME": 10})
+        self.assertFalse(sl.is_stacked(path))
+
     def test_everything_side_by_side(self):
         self.touch(f"{self.NAME}.fit")
         self.touch(f"{self.NAME}.jpg")
