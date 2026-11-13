@@ -198,8 +198,60 @@ Use the flux-weighted width, not the geometric extent: outlying pixels
 put the widest satellites at 7.6 working px on that measure. Do not
 normalise it by the stars — it spans 0.62 to 2.30 over the same tracks.
 
-The meteor/aircraft split is **unvalidated**: neither has been confirmed
-in this data.
+The meteor/aircraft split is **unvalidated**: no aircraft has been
+confirmed in this data, and the two meteors below were not caught by it.
+
+### First confirmed meteors, and what they say about width
+
+Session `M 45` (S30 Pro, 30 s, 1486 frames, 2026-11-02 to 05, during the
+Taurids — the Pleiades sit about ten degrees from their radiant). Two
+tracks confirmed as meteors by the owner, on the previews:
+
+| frame | width (working px) | `taper` | `head_position` | filed as |
+| --- | ---: | ---: | ---: | --- |
+| `20261105-010712` | 1.84 | 5.18 | 0.08 | Satellites |
+| `20261103-045310` | 2.36 | 1.18 | 0.28 | Satellites |
+
+What identified them by eye, in order of weight:
+
+- **A green glow on one side of the trail, along its whole length**,
+  while the stars beside it are white — so not chromatic aberration. A
+  satellite reflects sunlight and cannot produce it; the 557.7 nm oxygen
+  line, which lingers for seconds after a meteor and drifts with the
+  upper-air wind, does.
+- **One frame only.** Nothing on the two frames either side. This rules
+  out a slow satellite (see below) but not a fast one, which also
+  crosses the field within one exposure.
+- On `010712`, one end clearly dimmer than the other. On `045310` the
+  `head_ratio` peak at 28% is a bright star sitting on the trail, the
+  known trap — its `taper` of 1.18 is the honest number.
+
+Both are **below** `wide_track_width` (2.41 working px), so the
+detector reports them as satellites. Both are also above the 1.52
+ceiling of the original 26 satellites — but do not read that as a gap to
+put a threshold in, because the same session breaks the ceiling from the
+other side:
+
+**A slow satellite measured 3.16 and raised a false meteor.** One track
+of about 165 working px at a tilt of 62–63° is on eight consecutive
+frames, `20261105-040548` to `040940` — an object in a high orbit,
+visible through every exposure. Its width reads 0.63 to 1.37 on most of
+them, 3.16 on `040651`, which `taper` 4.56 then filed under **Meteors**.
+`040753` holds a second track, at 149°, measuring 3.40. A star merging
+into a short track is the likeliest cause, as with the profile.
+
+So on this session the width separates nothing, and two examples are no
+basis for moving `wide_track_width`. Two leads, neither measured yet:
+
+- **Persistence.** A track at the same tilt and span on neighbouring
+  frames is a satellite. That is physical — a meteor lasts a fraction of
+  a second — and it would have cleared `040651`. It needs the track's
+  position as well as its tilt to be safe on a field crossed by several
+  satellites.
+- **Colour.** The green is the strongest single cue the eye used. The
+  detector measures the raw Bayer mosaic, which does keep the green
+  photosites apart, so a green excess along the track is measurable in
+  principle. Untested.
 
 **Blind spot, and it is closed.** On `NGC 7380_Wizard` (1080x1920, 20 s
 subs) all 22 ticked satellites are missed and no fragment exists — not

@@ -284,7 +284,18 @@ tracks and correlates 0.6 with brightness. The absolute width is tighter.
 ### What is still guesswork
 
 Which kind of wide thing it is. Aircraft take the evenly-lit branch,
-meteors the tapered one, and **neither has ever been seen in this data**.
+meteors the tapered one. No aircraft has been seen in this data. **Two
+meteors now have** -- `M 45`, `20261105-010712` and `20261103-045310`,
+confirmed by the owner -- and the detector filed both as satellites:
+they measure 1.84 and 2.36 working px, under `wide_track_width`. The
+same session holds a slow satellite that measures 3.16 on one frame and
+was filed as a meteor. So width does not separate them there, and two
+examples are no reason to move the threshold. What the owner actually
+recognised them by was a **green glow along one side of the trail**, and
+a single-frame track; a satellite recurring at the same tilt on
+consecutive frames is the cue that would have cleared the false one.
+Details and numbers in `DETECTION.md`, under "First confirmed meteors".
+Do not tune `wide_track_width` on these two.
 The owner reports the old aircraft rule firing correctly on a sub of
 their own that is not in this repository — so if you touch the width
 measure, ask them to re-run that frame. That precedent also settles the

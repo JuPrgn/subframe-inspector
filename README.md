@@ -399,11 +399,13 @@ answer to the question.
 
 ## Known limits
 
-- **The meteor and aircraft categories are unproven.** Neither has fired
-  on any session tested so far. The gate they share — a track wider than
-  the seeing disc — is on firm ground; the split between them, which goes
-  on whether the light fades along the trail, is not. Getting it wrong
-  files one preview in the wrong folder, which is why it ships anyway.
+- **Meteors usually end up in Satellites.** The first two meteors
+  confirmed in this data were thinner than the meteor gate and were filed
+  as satellites, while a slow satellite was once filed as a meteor. What
+  gives a meteor away on the preview is a green glow along one side of the
+  trail, on a single frame; check the Satellites folder for it, and tick
+  what you find as Meteor in the labeller. No aircraft has been confirmed
+  yet. A misfiled track costs one preview in the wrong folder.
 - **A trail's brightness profile alone would not identify a meteor.** A
   satellite can glint in mid-passage, and a star sitting on the trail
   inflates the peak, so `head_ratio` and `taper` vary widely among
