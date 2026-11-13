@@ -707,3 +707,17 @@ Expect the wall-clock figure to move a lot between machines, and even on
 one: on a laptop the same session can take twice as long on battery, or
 after an hour of continuous work, as it does on mains from cold. Compare
 runs taken under the same conditions.
+
+## License
+
+Copyright (C) 2026 JuPrgn <juprgn@gmail.com>
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License in [`LICENSE`](LICENSE) for more details.
