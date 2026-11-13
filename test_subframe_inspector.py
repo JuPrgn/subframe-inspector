@@ -28,6 +28,7 @@ from dataclasses import replace
 import numpy as np
 
 import replay_cases as rc
+import session_layout as sl
 import subframe_inspector as si
 
 
@@ -1117,6 +1118,99 @@ class TestReplayScoring(unittest.TestCase):
         thresholds = si.Thresholds.derive(settings, geometry())
         with self.assertRaises(SystemExit):
             rc.check_segment_floor(bundle, settings, thresholds)
+
+
+class TestSessionLayout(unittest.TestCase):
+    """Finding a session's frames and previews, whatever the folder holds."""
+
+    NAME = "Light_M 45_10.0s_LP_20261014-215003"
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = os.path.join(self.temp.name, "M 45_sub")
+
+    def touch(self, relative: str) -> str:
+        path = os.path.join(self.root, *relative.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as handle:
+            handle.write("x")
+        return path
+
+    def test_the_seestar_layout(self):
+        self.touch(f"Lights/{self.NAME}.fit")
+        self.touch(f"JPG/{self.NAME}.jpg")
+        self.touch(f"JPG/{self.NAME}_thn.jpg")
+        session = sl.resolve(self.root)
+        self.assertEqual([os.path.basename(f) for f in session.frames],
+                         [f"{self.NAME}.fit"])
+        self.assertEqual(list(session.previews), [self.NAME])
+
+    def test_a_stack_beside_lights_is_not_a_sub(self):
+        """The subs in Lights/ win over whatever .fit sits at the root."""
+        self.touch(f"Lights/{self.NAME}.fit")
+        self.touch("NGC_7331_69x20sec.fit")
+        self.assertEqual(len(sl.resolve(self.root).frames), 1)
+
+    def test_seestar_stacks_and_thumbnails_are_never_frames(self):
+        self.touch(f"{self.NAME}.fit")
+        self.touch("Stacked_75_M 45_10.0s_LP_20261014-220000.fit")
+        self.touch(f"{self.NAME}_thn.jpg")
+        session = sl.resolve(self.root)
+        self.assertEqual(len(session.frames), 1)
+        self.assertEqual(session.previews, {})
+
+    def test_everything_side_by_side(self):
+        self.touch(f"{self.NAME}.fit")
+        self.touch(f"{self.NAME}.jpg")
+        session = sl.resolve(self.root)
+        self.assertIsNotNone(session.preview_for(session.frames[0]))
+
+    def test_case_does_not_matter(self):
+        self.touch(f"lights/{self.NAME}.FIT")
+        self.assertEqual(len(sl.resolve(self.root).frames), 1)
+
+    def test_the_review_copies_are_not_previews(self):
+        self.touch(f"{self.NAME}.fit")
+        self.touch(f"REVIEW/Trailing/{self.NAME}.jpg")
+        self.assertEqual(sl.resolve(self.root).previews, {})
+
+    def test_picking_the_lights_folder_finds_the_session(self):
+        self.touch(f"Lights/{self.NAME}.fit")
+        self.assertEqual(sl.session_root(os.path.join(self.root, "Lights")),
+                         os.path.abspath(self.root))
+
+    def test_a_session_at_the_root_stays_where_it_is(self):
+        self.touch(f"{self.NAME}.fit")
+        self.assertEqual(sl.session_root(self.root), os.path.abspath(self.root))
+
+    def test_sessions_are_found_under_a_parent_but_not_inside_one(self):
+        self.touch(f"Lights/{self.NAME}.fit")
+        other = os.path.join(self.temp.name, "nested", "M 81_sub")
+        os.makedirs(other)
+        open(os.path.join(other, "a.fit"), "w").close()
+        found = [s.root for s in sl.find_sessions(self.temp.name)]
+        self.assertEqual(found, sorted([os.path.abspath(self.root),
+                                        os.path.abspath(other)], key=str.lower))
+
+    def test_a_custom_layout(self):
+        self.touch(f"raw/{self.NAME}.fits")
+        self.touch(f"previews/{self.NAME}.jpg")
+        layout = sl.Layout(frames=sl.Layout.parse("raw/*.fits"),
+                           previews=sl.Layout.parse(r"previews\*.jpg"))
+        session = sl.resolve(self.root, layout)
+        self.assertEqual(len(session.frames), 1)
+        self.assertIsNotNone(session.preview_for(session.frames[0]))
+
+    def test_housekeeping_follows_the_previews_wherever_they_are(self):
+        """A copy is cleared only when its preview exists, in any layout."""
+        self.touch(f"Lights/{self.NAME}.fit")
+        self.touch(f"Lights_JPG/{self.NAME}.jpg")
+        self.touch(f"REVIEW/Trailing/{self.NAME}.jpg")
+        self.touch("REVIEW/Trailing/moved_only.jpg")
+        si.clean_review_folder(self.root, S)
+        trailing = os.path.join(self.root, "REVIEW", "Trailing")
+        self.assertEqual(os.listdir(trailing), ["moved_only.jpg"])
 
 
 if __name__ == "__main__":

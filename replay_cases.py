@@ -48,12 +48,13 @@ from typing import Sequence
 from subframe_inspector import (  # noqa: E402 -- grouped on purpose
     CATEGORY_CLOUDS, CATEGORY_METEORS, CATEGORY_SATELLITES, CATEGORY_TRAILING,
     CATEGORY_AIRCRAFT, DEFAULT_SETTINGS, MEASUREMENT_SETTINGS, FrameStats,
-    DEFAULT_SETTINGS as SETTINGS, MEASUREMENT_PARTS, SessionReference,
+    MEASUREMENT_PARTS, SessionReference,
     Settings, Thresholds, cases_session, classify_frame, find_star_doubling,
     find_sub_folders, find_track, measurement_fingerprint,
     measurement_fingerprints, read_cases, read_frame_labels, session_label,
     select_track_segments,
 )
+from session_layout import configured_layout, resolve  # noqa: E402
 
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -458,14 +459,13 @@ def find_source(folder: str, frame_id: str) -> tuple[str, str] | None:
     stretch one for the eye -- so that renderer is reused rather than
     written a second time.
     """
-    previews = sorted(
-        path for path in glob.glob(os.path.join(folder, SETTINGS.preview_folder,
-                                                f"*{frame_id}*"))
-        if path.lower().endswith(tuple(e.lower()
-                                       for e in SETTINGS.preview_extensions)))
+    session = resolve(folder, configured_layout())
+    previews = sorted(path for stem, path in session.previews.items()
+                      if frame_id in stem)
     if previews:
         return previews[0], "jpg"
-    frames = sorted(glob.glob(os.path.join(folder, f"*{frame_id}*.fit*")))
+    frames = [path for path in session.frames
+              if frame_id in os.path.basename(path)]
     return (frames[0], "fits") if frames else None
 
 
@@ -573,8 +573,9 @@ def collect_disagreements(paths: Sequence[str], results_by_path: dict,
             picks.sort(key=lambda row: row[0])
             here = []
             for _, category, case in picks:
-                found = sorted(glob.glob(os.path.join(
-                    folder, f"*{case['id']}*.fit*")))
+                found = [path for path in
+                         resolve(folder, configured_layout()).frames
+                         if case['id'] in os.path.basename(path)]
                 if found:
                     here.append(
                         (found[0], f"{category}_{target}_{case['id']}"

@@ -11,21 +11,62 @@ a minute.
 
 **What it touches.** Everything it produces lives under `REVIEW/`, and
 the only files it deletes there are the ones it wrote itself. Two options
-reach outside that folder, both off by default: `--mode move` takes the
-JPG *preview* out of `JPG/` rather than copying it, and
-`--delete-flagged` removes the `.fit` files of flagged frames. Without
-those two, your FITS are read and nothing more.
+reach outside that folder, both off by default: *move* mode takes the JPG
+*preview* out of its folder rather than copying it, and *Delete flagged
+FITS* removes the `.fit` files of flagged frames. Without those two, your
+FITS are read and nothing more.
+
+## Getting started (Windows)
+
+1. Install [Python](https://www.python.org/downloads/) 3.10 or newer,
+   ticking *Add python.exe to PATH*. Skip this if you already have one.
+2. Download or copy this folder anywhere on your disk.
+3. Double-click **`setup.bat`**. It creates a private environment in
+   `.venv/`, installs numpy, scipy, astropy and Pillow into it, and
+   creates two shortcuts — in the folder, and on the desktop if you say
+   so. To use a Python that is not on PATH (WinPython, say), drag its
+   `python.exe` onto `setup.bat`, or run `setup.bat C:\path\to\python.exe`.
+4. Open **Subframe Inspector** to analyse a night, **Subframe Labeller**
+   to go through its frames by eye.
+
+Run `setup.bat` again after moving the folder: the shortcuts hold its
+path. Nothing is installed outside the folder; deleting it uninstalls
+everything.
+
+### The inspector window
+
+Choose a folder at the top — one night, or a whole drive of them: every
+session found under it is listed with its frame count, its previews,
+when it was last analysed and what was flagged, and how much of it you
+have labelled. The last folders you used are kept in the drop-down.
+
+Select one session or several (Ctrl/Shift-click), set the options, and
+press **Analyse**. Several sessions are analysed one after the other.
+The report scrolls past in the bottom pane; afterwards **Open REVIEW
+folder** shows the filed previews, **Label / view frames…** opens the
+labeller on that session, and **Delete flagged FITS…** offers the one
+irreversible action, described [below](#deleting-the-fits).
+
+| Option | Effect |
+| --- | --- |
+| Copy / Move into REVIEW/ / Reports only | what happens to the previews of flagged frames |
+| Trailing sensitivity | how oval the stars must be to count as trailed; lower catches milder trailing |
+| Draw what was detected | annotate the copies filed in `REVIEW/`, see [Debug mode](#debug-mode) |
+| Worker processes | lower it if a run reports frames it could not read for want of memory |
+| Export a case bundle | for re-tuning the thresholds later, see [below](#keeping-a-session-after-the-frames-are-gone) |
+
+Errors are shown in a dialog and written to
+`subframe_inspector_errors.log` beside the tools — send that file along
+with a bug report.
 
 ## Requirements
 
-Python 3.10 or newer:
+Python 3.10 or newer, with `numpy`, `scipy` and `astropy`; `pillow` for
+the labeller and `--debug`. `setup.bat` installs them; by hand:
 
 ```
 pip install -r requirements.txt
 ```
-
-`numpy`, `scipy` and `astropy` are needed; `pillow` only for `--debug`,
-and the run says so rather than failing if it is missing.
 
 **Instruments.** It is built for the whole Seestar range: the focal
 length and pixel pitch come out of the FITS header and every threshold is
@@ -36,43 +77,70 @@ long as their headers carry `FOCALLEN` and `XPIXSZ`; without those the
 run warns you that it is guessing the plate scale, and the thresholds
 will need moving.
 
-## Layout
+## Folder layout
 
-Put the script next to your capture folders:
-
-```
-subframe_inspector.py
-LBN 550_sub/
-├── Light_....fit          the frames to inspect
-├── JPG/                   one .jpg preview per .fit, same base name
-└── REVIEW/                created by the script
-    ├── Trailing/
-    ├── Clouds_Haze/
-    ├── Satellites/
-    ├── Meteors/
-    └── Aircraft/
-```
-
-`JPG/` is optional. Without it the run reports normally, says so, and
-copies nothing.
-
-## Usage
+A **session** is any folder holding the light frames of a night. The
+tools recognise the usual Seestar layouts by themselves:
 
 ```
-python subframe_inspector.py                        # pick a folder, copy previews
+M 45_sub/                       M 45_sub/
+├── Lights/      the .fit       ├── Light_....fit
+├── JPG/         the previews   ├── Light_....jpg
+└── REVIEW/      created here   └── REVIEW/
+```
+
+— and anything in between: frames at the root or in `Lights/`, previews
+in `JPG/`, `Lights_JPG/`, `Lights/` or beside the frames. The Seestar's
+own `Stacked_*` results and `*_thn.jpg` thumbnails are ignored, and when
+the subs are in `Lights/`, a stack you left at the root is not mistaken
+for one. Picking the `Lights/` folder itself works too: the session is
+the folder above it. `REVIEW/` and `labels.csv` are always written in the
+session folder.
+
+Previews are optional. Without them the run reports normally, says so,
+and files nothing; the labeller shows the FITS instead.
+
+**Your own layout.** If you keep your nights some other way, open
+*Folder layout…* in either window and describe it as patterns relative
+to the session folder, one per line, e.g. `raw/*.fits` for the frames and
+`previews/*.jpg` for the previews. The dialog shows what the patterns
+find in a session of your choice before you save them. They are stored
+in `subframe_inspector_settings.json` beside the tools, and the command
+line uses them too.
+
+```
+REVIEW/
+├── Trailing/
+├── Clouds_Haze/
+├── Satellites/
+├── Meteors/
+├── Aircraft/
+├── report.csv
+└── report.md
+```
+
+## Command line
+
+Everything the window does is also available from a terminal, for
+scripting or for working on the detector itself.
+
+```
+python subframe_inspector.py                        # sessions under the current folder
+python subframe_inspector.py "D:\Astro"             # sessions under D:\Astro
 python subframe_inspector.py "LBN 550_sub"
 python subframe_inspector.py "LBN 550_sub" --mode report
 python subframe_inspector.py "LBN 550_sub" --debug
 python subframe_inspector.py "LBN 550_sub" --trailing 1.45
 ```
 
-With no folder it finds the `*_sub` folders beside it and asks which one
-to use. A frame that raised several alerts is filed under each of them.
+The folder may be a session or a folder holding several; with several it
+lists them and asks which one to use. A frame that raised several alerts
+is filed under each of them.
 
 | Option | Effect |
 | --- | --- |
 | `--mode copy` | copy previews into `REVIEW/` (default) |
-| `--mode move` | move them out of `JPG/` |
+| `--mode move` | move them out of their folder |
 | `--mode report` | write the two reports and nothing else |
 | `--debug` | draw on the previews as they are filed, showing what triggered each alert |
 | `--trailing RATIO` | how oval the stars must be to count as trailed (default 1.30) |
@@ -261,7 +329,7 @@ A trailed frame shows a comb of cyan ticks all leaning the same way; a
 clean one shows a field of dots. The verdict and its numbers are printed
 across the top.
 
-The preview in `JPG/` is read and left alone — only the copies under
+The original preview is read and left alone — only the copies under
 `REVIEW/` carry the marks. Needs Pillow, and adds a few seconds. With
 `--mode move` the preview leaves `JPG/` and only the annotated copy
 survives, which the run warns you about.
@@ -460,11 +528,14 @@ and the CSV, and no unit test can answer it.
 ## Labelling by eye
 
 Every threshold here was fixed by looking at previews and writing down
-what was actually on them. `label_frames.py` is that job made bearable:
+what was actually on them. **Subframe Labeller** is that job made
+bearable. It opens on the same session list as the inspector —
+double-click a night — or straight on one session from the inspector's
+*Label / view frames…* button. From a terminal:
 
 ```
 python label_frames.py "LBN 550_sub"
-python label_frames.py                  # asks which session
+python label_frames.py                  # opens the session list
 ```
 
 It shows the previews one at a time, in the order they were shot, with

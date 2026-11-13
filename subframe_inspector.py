@@ -33,10 +33,12 @@ converted to pixels once, from the FITS header, so the same settings
 hold for an S30, an S50 and an S50 Pro despite their different focal
 lengths and sensors.
 
-Expected layout, alongside this script::
+A session is any folder holding light frames, laid out the way the
+Seestar writes them or the way the user configured -- see
+``session_layout``. Typically::
 
-    <Target>_sub/           the light frames to inspect
-    <Target>_sub/JPG/       previews, one .jpg per .fit
+    <Target>_sub/Lights/    the light frames to inspect (or at the root)
+    <Target>_sub/JPG/       previews, one .jpg per .fit (optional)
     <Target>_sub/REVIEW/    created here, one subfolder per alert
 
 Only the JPG previews are ever copied or moved. The FITS files are left
@@ -47,7 +49,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import glob
 import gzip
 import hashlib
 import inspect
@@ -60,11 +61,14 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass, field, fields, replace
-from typing import Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 from astropy.io import fits
 from scipy.ndimage import grey_opening, label
+
+from session_layout import (Session, configured_layout, find_sessions,
+                            frame_stem, resolve, session_root)
 
 # The report uses emoji. On a Windows console still running cp1252 --
 # cmd.exe out of the box, or any launch outside an IDE -- the very first
@@ -1799,19 +1803,27 @@ def _measure_shifts(frames: Sequence[FrameStats], thresholds: Thresholds) -> Non
             previous = frame.star_positions
 
 
-def classify_session(frames_folder: str, mode: str | None = "copy",
-                     settings: Settings = DEFAULT_SETTINGS) -> dict[str, list[str]]:
-    """Analyse a folder of light frames and file the flagged previews.
+def classify_session(frames_folder: str | Session, mode: str | None = "copy",
+                     settings: Settings = DEFAULT_SETTINGS,
+                     progress: Callable[[int, int], None] | None = None
+                     ) -> dict[str, list[str]]:
+    """Analyse a session's light frames and file the flagged previews.
 
-    ``mode`` is "copy", "move", or None to skip the filing step entirely
-    and only print the report.
+    ``frames_folder`` is a session folder, resolved with the configured
+    layout, or a :class:`Session` already resolved. ``mode`` is "copy",
+    "move", or None to skip the filing step entirely and only print the
+    report. ``progress`` is called with (frames done, total) as the
+    analysis goes, for a window to show.
 
     Returns the categories raised per frame, which is also what gets
     handed to :func:`sort_previews`.
     """
+    session = (frames_folder if isinstance(frames_folder, Session)
+               else resolve(session_root(frames_folder), configured_layout()))
+    frames_folder = session.root
     # Sorted by name, which is chronological with Seestar's timestamps --
     # the frame-to-frame shift depends on it.
-    paths = sorted(glob.glob(os.path.join(frames_folder, "*.fit*")))
+    paths = session.frames
     if not paths:
         print(f"⚠️ No FITS files in '{frames_folder}'.")
         return {}
@@ -1842,8 +1854,13 @@ def classify_session(frames_folder: str, mode: str | None = "copy",
         # Without a chunk size each frame is a separate task and the
         # scheduling costs more than the work on short runs.
         chunk = max(1, len(paths) // (4 * (os.cpu_count() or 4)))
-        frames = [frame for frame in pool.map(analyse_frame, paths, chunksize=chunk)
-                  if frame is not None]
+        frames = []
+        for done, frame in enumerate(pool.map(analyse_frame, paths,
+                                              chunksize=chunk), start=1):
+            if frame is not None:
+                frames.append(frame)
+            if progress is not None:
+                progress(done, len(paths))
 
     if not frames:
         print("⚠️ No frame could be read.")
@@ -1886,12 +1903,14 @@ def classify_session(frames_folder: str, mode: str | None = "copy",
     # Only when previews are actually being filed: "report" mode is
     # documented as touching nothing, and throwing away the previous
     # run's picks without replacing them would be a nasty surprise.
-    cleared = clean_review_folder(frames_folder, settings) if mode else 0
+    cleared = (clean_review_folder(frames_folder, settings, session.previews)
+               if mode else 0)
     report_folder = write_reports(frames_folder, rows, counts, elapsed, settings)
     cases_path = (write_cases(frames_folder, frames, rows, reference, geometry,
                               settings, expected=len(paths))
                   if settings.export_cases else None)
-    filed = (sort_previews(frames_folder, flagged, mode, geometry, settings)
+    filed = (sort_previews(frames_folder, flagged, mode, geometry, settings,
+                           session.previews)
              if mode else 0)
 
     print("\n" + "=" * 60)
@@ -2060,16 +2079,6 @@ def draw_debug_overlay(frame: FrameStats, messages: Sequence[str],
 #  Output
 # ======================================================================
 
-def find_preview(preview_folder: str, stem: str,
-                 settings: Settings) -> str | None:
-    """The JPG that goes with one frame, whatever case its suffix is in."""
-    for extension in settings.preview_extensions:
-        candidate = os.path.join(preview_folder, stem + extension)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
-
-
 @dataclass(frozen=True)
 class FilingJob:
     """One preview, and everywhere it has to end up."""
@@ -2105,7 +2114,8 @@ def _file_one(job: tuple) -> str | None:
 
 def sort_previews(frames_folder: str,
                   flagged: Sequence[tuple[FrameStats, list[str], list[str]]],
-                  mode: str, geometry: Geometry, settings: Settings) -> int:
+                  mode: str, geometry: Geometry, settings: Settings,
+                  previews: dict[str, str] | None = None) -> int:
     """File the JPG preview of every flagged frame under REVIEW/<category>/.
 
     The FITS files are never touched, whatever the mode -- a wrong
@@ -2119,28 +2129,30 @@ def sort_previews(frames_folder: str,
     already shows why each frame is in it.
 
     ``flagged`` carries, per frame, its categories and the messages to
-    print on the overlay.
+    print on the overlay. ``previews`` maps a frame's name to its JPG,
+    as the session layout found them; left out, the session folder is
+    resolved again.
     """
     if not flagged:
         return 0
 
-    source_folder = os.path.join(frames_folder, settings.preview_folder)
+    if previews is None:
+        previews = resolve(frames_folder, configured_layout()).previews
     review_root = os.path.join(frames_folder, settings.review_folder)
 
-    if not os.path.isdir(source_folder):
-        print(f"ℹ️ No '{settings.preview_folder}/' folder — reports only, "
-              f"nothing to file.")
+    if not previews:
+        print("ℹ️ No JPG previews found — reports only, nothing to file.")
         return 0
 
     if settings.debug and mode == "move":
-        print("ℹ️ --debug with --mode move: the preview leaves JPG/ and only "
-              "the annotated copy survives.")
+        print("ℹ️ --debug with --mode move: the preview leaves its folder and "
+              "only the annotated copy survives.")
 
     jobs = []
     missing = 0
     for frame, categories, messages in flagged:
-        stem = os.path.splitext(frame.name)[0]
-        preview = find_preview(source_folder, stem, settings)
+        stem = frame_stem(frame.name)
+        preview = previews.get(stem)
         if preview is None:
             missing += 1
             continue
@@ -2178,7 +2190,8 @@ def sort_previews(frames_folder: str,
                for job, problem in zip(jobs, problems) if problem is None)
 
 
-def clean_review_folder(frames_folder: str, settings: Settings) -> int:
+def clean_review_folder(frames_folder: str, settings: Settings,
+                        previews: dict[str, str] | None = None) -> int:
     """Clear out what the last run wrote, and nothing else.
 
     Without this, a threshold that used to flag a frame leaves its
@@ -2187,18 +2200,21 @@ def clean_review_folder(frames_folder: str, settings: Settings) -> int:
 
     Deleting inside a folder the owner also uses calls for a rule that
     cannot go wrong, so there is one: **a file is only removed when the
-    same name still exists in JPG/**. Everything this script writes is a
-    copy of a preview, so everything it wrote is covered; anything else
-    -- notes, keepers, a preview a previous ``--mode move`` run took out
-    of JPG/ and which now exists nowhere else -- is left alone.
+    preview it copies still exists** -- among the previews the session
+    layout finds, which is ``JPG/`` on the usual layout. Everything this
+    script writes is a copy of a preview, so everything it wrote is
+    covered; anything else -- notes, keepers, a preview a previous
+    ``--mode move`` run took out of its folder and which now exists
+    nowhere else -- is left alone.
     """
     review_root = os.path.join(frames_folder, settings.review_folder)
     if not os.path.isdir(review_root):
         return 0
 
-    source_folder = os.path.join(frames_folder, settings.preview_folder)
-    reproducible = set(os.listdir(source_folder)) if os.path.isdir(source_folder) else set()
-    reproducible |= {os.path.splitext(name)[0] + ".jpg" for name in reproducible}
+    if previews is None:
+        previews = resolve(frames_folder, configured_layout()).previews
+    reproducible = {os.path.basename(path) for path in previews.values()}
+    reproducible |= {stem + ".jpg" for stem in previews}
 
     removed = 0
     for name in (settings.report_csv, settings.report_markdown):
@@ -2769,9 +2785,8 @@ def delete_flagged_frames(selection: dict[str, list[str]]) -> tuple[int, int]:
 
 
 def find_sub_folders(root: str = ".") -> list[str]:
-    """List the '<Target>_sub' folders sitting next to this script."""
-    return sorted(os.path.join(root, name) for name in os.listdir(root)
-                  if name.endswith("_sub") and os.path.isdir(os.path.join(root, name)))
+    """Every session folder under ``root``, with the configured layout."""
+    return [session.root for session in find_sessions(root, configured_layout())]
 
 
 def prompt_for_choice(items: Sequence[str], prompt: str = "Your choice") -> str:
@@ -2789,10 +2804,12 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Read the command line. Everything is optional; see the epilog."""
     parser = argparse.ArgumentParser(
         description="Triage Seestar light frames before stacking.",
-        epilog="With no folder, the '<Target>_sub' folders next to this "
-               "script are offered as a numbered list.")
+        epilog="The folder may be a session or a folder holding several; "
+               "with several -- or none given, which searches the current "
+               "folder -- they are offered as a numbered list. For a window "
+               "instead of this, run inspector_app.pyw.")
     parser.add_argument("folder", nargs="?",
-                        help="the folder of light frames to inspect")
+                        help="a session folder, or a folder holding sessions")
     parser.add_argument("--mode", choices=("copy", "move", "report", "none"),
                         default="copy",
                         help="what to do with the JPG previews of flagged "
@@ -2849,24 +2866,30 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
 
-    folder = arguments.folder
-    if folder is None:
-        candidates = find_sub_folders(".")
-        if not candidates:
-            print("⚠️ No '<Target>_sub' folder found next to this script.")
-            print("   Expected layout, e.g. 'LBN 550_sub/' holding the frames + JPG/.")
-            return 1
-        if len(candidates) == 1:
-            folder = candidates[0]
-        else:
-            print("🎯 Several frame folders found:")
-            folder = prompt_for_choice(candidates, "Select the folder to analyse")
-
+    folder = arguments.folder or "."
     if not os.path.isdir(folder):
         print(f"⚠️ '{folder}' is not a folder.")
         return 1
 
-    print(f"📂 Sorting frames in: {folder}\n")
+    layout = configured_layout()
+    session = resolve(session_root(folder, layout), layout)
+    if not session.frames:
+        candidates = find_sessions(folder, layout)
+        if not candidates:
+            print(f"⚠️ No light frames found in or under '{folder}'.")
+            print(f"   Looked for {layout.describe()}")
+            return 1
+        if len(candidates) == 1:
+            session = candidates[0]
+        else:
+            print("🎯 Several sessions found:")
+            chosen = prompt_for_choice([s.root for s in candidates],
+                                       "Select the session to analyse")
+            session = next(s for s in candidates if s.root == chosen)
+
+    print(f"📂 Sorting frames in: {session.root}")
+    print(f"   {len(session.frames)} frames ({session.frame_pattern}), "
+          f"{len(session.previews)} JPG previews\n")
 
     # Everything else lives in Settings, and can be overridden the same
     # way, e.g. replace(DEFAULT_SETTINGS, haze_sigma=3.0).
@@ -2877,7 +2900,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                        trailing_elongation_ratio=arguments.trailing)
 
     mode = None if arguments.mode in ("report", "none") else arguments.mode
-    categories_by_frame = classify_session(folder, mode=mode, settings=settings)
+    categories_by_frame = classify_session(session, mode=mode, settings=settings)
 
     if not arguments.delete_flagged:
         return 0
@@ -2889,8 +2912,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"\nℹ️ No flagged frame{scope} — nothing to delete.")
         return 0
 
-    frame_count = len(glob.glob(os.path.join(folder, "*.fit*")))
-    if not confirm_deletion(selection, frame_count, arguments.yes):
+    if not confirm_deletion(selection, len(session.frames), arguments.yes):
         return 0
 
     deleted, failed = delete_flagged_frames(selection)

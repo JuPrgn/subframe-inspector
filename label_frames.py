@@ -33,6 +33,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from session_layout import (configured_layout, load_config, resolve,
+                            session_root)
+
 # The console output uses emoji. On a Windows console still running
 # cp1252 the very first print would abort with UnicodeEncodeError.
 for _stream in (sys.stdout, sys.stderr):
@@ -229,26 +232,19 @@ def find_previews(folder: str) -> dict[str, str]:
             if name.lower().endswith((".jpg", ".jpeg"))}
 
 
-def find_fits(session: str) -> dict[str, str]:
-    """Map frame name to FITS path. A session may have no JPG at all."""
-    if not os.path.isdir(session):
-        return {}
-    return {base_name(name): os.path.join(session, name)
-            for name in sorted(os.listdir(session))
-            if name.lower().endswith((".fit", ".fits"))}
-
-
 def build_frames(session: str) -> list[Frame]:
     """Assemble the session: every frame, every image of it, its verdict.
 
     The frame list is the union of what is there -- report.csv when
     there is one, because it holds the clean frames too, plus the
-    previews and the FITS. A session with no JPG/ folder is perfectly
-    workable: the frames are read from the FITS instead.
+    previews and the FITS, found with the configured layout. A session
+    with no previews is perfectly workable: the frames are read from the
+    FITS instead.
     """
+    found = resolve(session, configured_layout())
     report = read_report(session)
-    previews = find_previews(os.path.join(session, "JPG"))
-    raw = find_fits(session)
+    previews = found.previews
+    raw = {base_name(path): path for path in found.frames}
 
     annotated: dict[str, str] = {}
     review = os.path.join(session, "REVIEW")
@@ -1660,59 +1656,87 @@ class Labeller:
 #  Entry point
 # ======================================================================
 
-def find_sub_folders(root: str = ".") -> list[str]:
-    """List the '<Target>_sub' folders sitting next to this script."""
-    return sorted(os.path.join(root, name) for name in os.listdir(root)
-                  if name.endswith("_sub") and os.path.isdir(os.path.join(root, name)))
+def choose_session() -> str | None:
+    """Show the session list and return the one picked, or None.
+
+    The window that replaced the numbered console prompt: pick a folder,
+    see every session under it with what has been done to it so far,
+    double-click one.
+    """
+    import tkinter as tk
+    from tkinter import ttk
+
+    from session_browser import SessionBrowser, install_error_hooks
+
+    chosen: list[str] = []
+    root = tk.Tk()
+    root.title("Frame labelling — choose a session")
+    root.geometry("900x560")
+    install_error_hooks(root)
+    config = load_config()
+
+    def pick(session) -> None:
+        chosen.append(session.root)
+        root.destroy()
+
+    body = ttk.Frame(root, padding=10)
+    body.pack(fill="both", expand=True)
+    browser = SessionBrowser(body, config, on_open=pick)
+    browser.pack(fill="both", expand=True)
+    buttons = ttk.Frame(body)
+    buttons.pack(fill="x", pady=(8, 0))
+    open_button = ttk.Button(buttons, text="Label this session",
+                             command=lambda: browser._opened())
+    open_button.pack(side="right")
+    ttk.Label(buttons, text="Double-click a session to open it.").pack(side="left")
+    root.mainloop()
+    return chosen[0] if chosen else None
 
 
-def prompt_for_choice(items: Sequence[str], prompt: str = "Your choice") -> str:
-    """Show a numbered list and ask the user to pick one entry."""
-    for index, item in enumerate(items, start=1):
-        print(f"   [{index}] {item}")
-    while True:
-        answer = input(f"{prompt} (1-{len(items)}): ").strip()
-        if answer.isdigit() and 1 <= int(answer) <= len(items):
-            return items[int(answer) - 1]
-        print("   ⚠️ Not a valid choice, try again.")
+def show_problem(message: str) -> None:
+    """Say what is wrong in a dialog: there may be no console to read."""
+    print(f"⚠️ {message}")
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showwarning("Frame labelling", message, parent=root)
+        root.destroy()
+    except Exception:  # no display at all: the print above is all there is
+        pass
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Label the previews of a session by eye, to build ground truth.",
-        epilog="With no folder, the '<Target>_sub' folders next to this script "
-               "are offered. Labels go to <folder>/labels.csv.")
+        epilog="With no folder, a window lists the sessions to choose from. "
+               "Labels go to <session>/labels.csv.")
     parser.add_argument("folder", nargs="?", help="the session folder")
     arguments = parser.parse_args(argv)
-
-    folder = arguments.folder
-    if folder is None:
-        candidates = find_sub_folders(".")
-        if not candidates:
-            print("⚠️ No '<Target>_sub' folder found next to this script.")
-            return 1
-        if len(candidates) == 1:
-            folder = candidates[0]
-        else:
-            print("\U0001f3af Several sessions found:")
-            folder = prompt_for_choice(candidates, "Select the session to label")
-
-    if not os.path.isdir(folder):
-        print(f"⚠️ '{folder}' is not a folder.")
-        return 1
 
     try:
         import tkinter as tk
         from PIL import Image  # noqa: F401  -- checked here, used in Labeller
     except ImportError as error:
-        print(f"⚠️ This tool needs tkinter and Pillow: {error}")
-        print("   pip install pillow")
+        show_problem(f"This tool needs tkinter and Pillow: {error}\n"
+                     f"pip install pillow")
         return 1
+
+    folder = arguments.folder
+    if folder is None:
+        folder = choose_session()
+        if folder is None:
+            return 0
+    if not os.path.isdir(folder):
+        show_problem(f"'{folder}' is not a folder.")
+        return 1
+    folder = session_root(folder, configured_layout())
 
     frames = build_frames(folder)
     if not frames:
-        print(f"⚠️ No previews and no report in '{folder}'.")
-        print("   Expected a JPG/ folder, or REVIEW/report.csv from an earlier run.")
+        show_problem(f"No light frames, previews or report in '{folder}'.\n"
+                     f"Check the folder layout in the session list.")
         return 1
 
     labels_path = os.path.join(folder, LABELS_FILENAME)
@@ -1732,7 +1756,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"   ⚠️ {missing} of them have no image to show at all.")
     print(f"\U0001f4dd {labels_path} · {len(labels)} already labelled\n")
 
+    from session_browser import install_error_hooks
     root = tk.Tk()
+    install_error_hooks(root)
     Labeller(root, folder, frames, labels_path, labels)
     root.mainloop()
 

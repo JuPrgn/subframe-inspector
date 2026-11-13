@@ -792,26 +792,58 @@ your own work, since the previews line up with the FITS pixel for pixel.
 
 | | |
 | --- | --- |
-| `subframe_inspector.py` | the whole tool, one file on purpose -- it is meant to be dropped next to a capture folder and run |
+| `subframe_inspector.py` | the detector, and its command line. Every measurement and every verdict lives here |
+| `session_layout.py` | where a session's frames and previews are: relative patterns, tried from the session folder, plus the saved preferences. Standard library only, because the labeller must run without numpy |
+| `inspector_app.py` | the analysis window. Calls `classify_session` exactly as `main()` does, with stdout redirected into its log pane; decides nothing itself |
+| `session_browser.py` | the session list both windows open on, the layout dialog, and the error hooks that make a traceback visible under pythonw |
+| `label_frames.py` | the labelling window: frames one at a time with a close-up beside them, recording what the eye saw into `<session>/labels.csv`. Filters both halves -- what the detector flagged and what the owner ticked, `Clean for me` included, which is the view to point them at when the corpus needs solid negatives. Shows the JPG preview, the `REVIEW/` copy or the FITS itself, so a session with no previews still works. Reads `report.csv` rather than re-deriving any verdict; tkinter + Pillow, with numpy/astropy needed only for the FITS source |
+| `setup.bat` | one-time install for other users: a `.venv` beside the tools, and two `.lnk` shortcuts that start the windows through `pythonw` |
 | `DETECTION.md` | the specification behind every verdict: hypothesis, quantity, reference, number, and the measurement justifying it, per category -- plus the blind spots each one has |
 | `test_subframe_inspector.py` | stdlib `unittest`, no fixtures on disk, about a second |
 | `replay_cases.py` | re-runs the decisions on exported case bundles, with any settings, and scores them against the labels. Imports every rule from `subframe_inspector` and re-implements none |
 | `calibrate_doubling.py` | a tuning aid for the doubling detector, against real frames |
-| `label_frames.py` | the labelling window: frames one at a time with a close-up beside them, recording what the eye saw into `<session>/labels.csv`. Filters both halves -- what the detector flagged and what the owner ticked, `Clean for me` included, which is the view to point them at when the corpus needs solid negatives. Shows the JPG preview, the `REVIEW/` copy or the FITS itself, so a session with no `JPG/` still works. Reads `report.csv` rather than re-deriving any verdict; tkinter + Pillow, with numpy/astropy needed only for the FITS source |
 
-Resist splitting the tool into a package. Its deployment story is "copy
-one file next to your subs", the sections inside it are already the
-module boundaries a package would have, and nothing imports it but the
-three tools above.
+## Sharing the tool
+
+The owner now shares it with other Seestar users, who will not have a
+command line habit, a WinPython install, or the owner's folder layout.
+Their choices, from when this was set up:
+
+- **Python plus a launcher, not a frozen exe.** `setup.bat` builds a
+  venv and shortcuts; users install Python themselves.
+- **Two windows, not one.** The inspector and the labeller stay
+  separate programs; the inspector only launches the labeller.
+- **English** throughout the interface.
+- **Any layout.** Sessions are found by `session_layout` patterns,
+  never by a `_sub` suffix or a fixed `JPG/` folder, and users can type
+  their own patterns. Nothing may go back to assuming the owner's disk.
+
+Two things that follow and are easy to break:
+
+- **Nothing may require a console.** Under pythonw there is no stdin and
+  no visible stdout: an `input()` hangs forever and a traceback vanishes.
+  The command line keeps its prompts; the windows use dialogs, and
+  `install_error_hooks` writes uncaught errors to
+  `subframe_inspector_errors.log`.
+- **The deletion guarantees hold in the window too.** `DeleteDialog`
+  is reachable only after a run made in that window that filed the
+  previews, lists every frame, warns at half the session, and stays
+  disabled until `delete` is typed. Do not add a shortcut around it.
+
+`REVIEW/` housekeeping follows the previews wherever the layout found
+them: a copy is removed only if a preview of that name still exists.
+That is the same rule as before, with `JPG/` generalised -- keep it.
 
 ## Environment
 
 - The owner develops on more than one Windows machine, so nothing here
   should assume a particular core count, clock or interpreter path.
-- Python comes from a WinPython install (astropy 6.1.0), typically at
-  something like `C:\WPy64-31241\python-3.12.4.amd64\python.exe`. The
+- Python comes from a WinPython install, at the time of writing
+  `C:\WPy64-31350\python\python.exe` (Python 3.13, astropy 6.1). The
   `python` on PATH usually does **not** have astropy — check before
-  concluding the code is broken.
+  concluding the code is broken. A `.venv` made by `setup.bat` gets the
+  latest releases instead (numpy 2.5, astropy 8 when this was written);
+  a session's `report.csv` came out byte-identical under both.
 - Set `PYTHONIOENCODING=utf-8` when running from a console that is not
   already UTF-8.
 - Any helper script that uses multiprocessing needs an
