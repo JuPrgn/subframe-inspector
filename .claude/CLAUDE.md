@@ -329,10 +329,19 @@ which travel between machines far better than seconds do:
 
 | | |
 | --- | --- |
-| two morphological openings, 2 Mpx each | **~45%** |
-| the two `label` passes and the moments | ~16% |
-| reading and rescaling the FITS | ~9% |
-| everything else | the remainder |
+| reading and rescaling the FITS (`load_frame`) | **~29%** |
+| the full-resolution star pass (`measure_stars`, opening included) | ~26% |
+| the working-image top-hat (`bright_structure`) | ~23% |
+| `np.median` and `np.std` of the working image | ~11% |
+| `label`, the moments, the doubling vote, everything else | the remainder |
+
+Re-measured on 2026-11-14 (LBN 550 IRCUT, 8 frames, 246 ms a frame
+single-process, 79 ms wall in the pool on 12 logical cores). An earlier
+table put the two openings at 45% and the FITS read at 9%; the openings
+have not got cheaper, the rest has: the doubling vote went from 56 ms to
+3 ms (a KD-tree instead of a pairs-squared matrix), and the noise is
+taken once instead of twice. A frame with a track adds about 40 ms for
+the profile and the green glow.
 
 Four things follow, and each was tried before being written down.
 
@@ -391,7 +400,23 @@ judged trailed, only a continuously lit track counts -- so a nudge to the
 elongation silently changes which satellites are reported. A tenth of the
 run time is not worth that.
 
-`working_scale` has not been measured yet. Measure it the same way.
+**`working_scale` was measured the same way and refused.** The only
+coarser setting that changes anything on the main lens is a step of 3
+(`working_scale` 11.0, 11.2 arcsec/px, 2.25x fewer working pixels).
+Over three labelled sessions, read-only runs against the same frames:
+
+| | step 2 | step 3 | verdicts changed |
+| --- | ---: | ---: | ---: |
+| LBN 550 IRCUT 260909 (71) | 5.6 s | 4.4 s | 1 |
+| NGC 6910 IRCUT 260902 (61) | 4.8 s | 3.9 s | 2 |
+| NGC 6910 260902 (249) | 13.2 s | 10.6 s | 2 |
+
+A fifth of the run time, for four of the nine satellites the owner had
+ticked on the two NGC 6910 sessions (`044652`, `051837`, `224708`,
+`234416`), all lost as the faint fragments fall below the segment floor
+at the coarser scale. Trailing and the wrong-flag column do not move.
+Do not re-run it; the levers that remain are inside `load_frame` and
+the two openings, and both are fingerprinted.
 
 ## The one trap left
 

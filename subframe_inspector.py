@@ -1663,10 +1663,13 @@ def analyse_frame(path: str) -> FrameStats | FrameProblem:
         if not (settings.debug or settings.export_cases):
             stars = replace(stars, blobs=[])
 
+        # Once: over two megapixels it is 9 ms, and it used to be taken
+        # here and again for the frame's own noise below.
+        noise = float(np.std(small))
+
         track = find_track(segments, settings, thresholds)
         if track is not None:
-            profile = measure_track_profile(cleaned, labels, track,
-                                            float(np.std(small)))
+            profile = measure_track_profile(cleaned, labels, track, noise)
             track = replace(track, profile=replace(
                 profile, green=measure_track_green(
                     data, track, _context.geometry.step,
@@ -1692,7 +1695,7 @@ def analyse_frame(path: str) -> FrameStats | FrameProblem:
             path=path,
             background=float(np.median(small)),
             peak=float(np.max(small)),
-            noise=float(np.std(small)),
+            noise=noise,
             stars=stars,
             track=track,
             doubling=doubling,
@@ -2724,6 +2727,14 @@ def frame_of_case(case: dict) -> FrameStats:
     )
 
 
+# A label whose note starts with this was proposed by someone other than
+# the owner -- a blind pass by an assistant, say -- and is waiting for
+# their eye. Until the note goes it is not ground truth, and no bundle or
+# replay may score against it: the owner's word is the only thing the
+# scores are allowed to rest on.
+PROVISIONAL_NOTE = "à confirmer"
+
+
 def read_frame_labels(path: str) -> dict[str, dict]:
     """Read a labels.csv, keyed the way a bundle names its frames.
 
@@ -2732,6 +2743,9 @@ def read_frame_labels(path: str) -> dict[str, dict]:
     Seestar name carries its exposure as '60.0s', which defeats splitext.
     Takes the file rather than its folder so that a replay can be handed
     a labels.csv written after the bundle was.
+
+    Rows still marked PROVISIONAL_NOTE are left out: they are a proposal,
+    not a judgement, and a frame carrying one scores as unlabelled.
     """
     if not os.path.isfile(path):
         return {}
@@ -2741,8 +2755,11 @@ def read_frame_labels(path: str) -> dict[str, dict]:
             match = FRAME_TIMESTAMP.search((row.get("frame") or "").strip())
             if not match:
                 continue
+            note = (row.get("note") or "").strip()
+            if note.lower().startswith(PROVISIONAL_NOTE):
+                continue
             found[match.group(1)] = {"labels": (row.get("labels") or "").split(),
-                                     "note": (row.get("note") or "").strip()}
+                                     "note": note}
     return found
 
 
