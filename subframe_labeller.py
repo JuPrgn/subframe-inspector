@@ -61,10 +61,13 @@ class Category:
 CLEAN = "Clean"
 
 # The detector's own category names, so a label and a verdict can be
-# compared without a translation table. Only 'Clean' is not one of its
-# folders, and it is the one the corpus most lacks: there is no solid
-# negative anywhere in it, which is what keeps precision unmeasurable on
-# unlabelled frames.
+# compared without a translation table. Two are not folders of its own.
+# 'Clean' is the one the corpus most lacks: there is no solid negative
+# anywhere in it, which is what keeps precision unmeasurable on
+# unlabelled frames. 'Dew' -- fog on the lens -- the detector cannot yet
+# tell from cloud: its veil rule catches it and files it under
+# Clouds_Haze, so the two compare as agreeing (LABEL_TO_DETECTOR below).
+# Keeping the tick apart is what will let the two be separated later.
 #
 # A 'Doubling' button was here and has been removed. A jolt that prints
 # the field twice is a real and distinct fault -- the detector measures
@@ -78,13 +81,15 @@ CATEGORIES = (
     Category("Satellites", "Satellite", "4", "thin, regular straight track"),
     Category("Meteors", "Meteor", "5", "bright head, fading tail, glow"),
     Category("Aircraft", "Aircraft", "6", "wide track, evenly lit"),
+    Category("Dew", "Dew", "7", "fog on the lens: halos, washed-out field"),
 )
 
-# Kept although nothing writes 'Doubling' any more: this is the reading
-# side, and a labels.csv written before the button went must still
-# compare as agreeing with a Trailing verdict. replay_cases.py carries
-# the same alias for the same reason.
-LABEL_TO_DETECTOR = {"Doubling": "Trailing"}
+# How a label reads against a verdict. 'Doubling' is kept although
+# nothing writes it any more: a labels.csv written before the button
+# went must still compare as agreeing with a Trailing verdict. 'Dew' is
+# reported by the detector as Clouds_Haze, see above. replay_cases.py
+# carries the same aliases for the same reasons.
+LABEL_TO_DETECTOR = {"Doubling": "Trailing", "Dew": "Clouds_Haze"}
 
 # The three images a frame can have, in the order D walks through them.
 SOURCE_PREVIEW = "JPG preview"
@@ -608,7 +613,7 @@ class Labeller:
 
         help_bar = tk.Label(
             self.master,
-            text=("←/→ frames   ·   1-6 categories   ·   "
+            text=("←/→ frames   ·   1-7 categories   ·   "
                   "0 clear   ·   A accept detector   ·   "
                   "Enter validate + next   ·   "
                   "wheel zoom   ·   drag pan   ·   F fit   ·   "

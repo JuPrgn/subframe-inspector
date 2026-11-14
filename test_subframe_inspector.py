@@ -1146,6 +1146,21 @@ class TestCaseExport(unittest.TestCase):
         self.assertEqual(si.read_frame_labels(os.path.join(self.tmp(), "no.csv")),
                          {})
 
+    def test_a_label_waiting_for_the_owner_is_not_ground_truth(self):
+        """A blind pass by an assistant leaves rows noted 'à confirmer';
+        scoring against them would grade the tool with its own guesses."""
+        path = os.path.join(self.tmp(), "labels.csv")
+        with open(path, "w", newline="", encoding="utf-8") as handle:
+            handle.write("frame,labels,note,detected,updated\n")
+            handle.write("20261103-010000,Trailing,"
+                         "À confirmer (Claude; confiance basse),Trailing,2026-11-13\n")
+            handle.write("20261103-010100,Clouds_Haze,,Clouds_Haze,2026-11-13\n")
+        self.assertEqual(list(si.read_frame_labels(path)), ["20261103-010100"])
+
+    def test_dew_scores_as_the_haze_the_detector_reports_it_as(self):
+        self.assertEqual(rc.normalise(["Dew"]), (si.CATEGORY_CLOUDS,))
+        self.assertEqual(rc.normalise(["Dew", "Clouds_Haze"]), (si.CATEGORY_CLOUDS,))
+
     def test_a_case_carries_the_label_and_the_verdict_of_the_day(self):
         case = si.frame_case(self.frame(), 0, ["Trailing"],
                              {"labels": ["Satellites"], "note": "faint"})

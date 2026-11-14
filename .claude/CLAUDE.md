@@ -520,14 +520,30 @@ should reflect. It immediately paid for itself: a threshold change that
 looked like +8 recall turned out to be +1 real frame and +13 flags on
 frames the owner had looked at and passed over.
 
-The vocabulary is the detector's own plus `Clean`. A `Doubling` button
-existed briefly and was removed on the owner's ruling -- *"c'est du
-trailing"* -- having never been ticked once in 648 labelled frames. Both
-readers keep the alias anyway (`LABEL_ALIASES` in `replay_cases.py`,
+The vocabulary is the detector's own plus `Clean` and `Dew`. A `Doubling`
+button existed briefly and was removed on the owner's ruling -- *"c'est
+du trailing"* -- having never been ticked once in 648 labelled frames.
+Both readers keep the alias anyway (`LABEL_ALIASES` in `replay_cases.py`,
 `LABEL_TO_DETECTOR` in `subframe_labeller.py`), so a file written while it
 existed still counts as agreeing with a `Trailing` verdict. Do not add
 the button back without asking: the distinction is real, but it belongs
 to `doubling_px` in the CSV, not to the labels.
+
+`Dew` (key 7) is the owner's decision of 2026-11-14: fog on the lens is
+a fault of its own, but the detector cannot yet tell it from cloud -- it
+dims the stars without raising the sky, which is exactly the veil rule
+-- so it is reported as `Clouds_Haze` and the same two aliases map `Dew`
+there for scoring. Keep that until a measure separates the two; the tick
+is what will make that measurable. On `LBN 550_IRCUT_260909_sub` 81 rows
+carry the word in the note from before the tick existed, 66 of them
+with no tick at all; those are the "wrong" and "unjudged" cloud flags
+that session shows, and converting them is the owner's call.
+
+**A label noted `à confirmer` is not ground truth.** An assistant's
+blind pass over `M 45` (2026-11-13) left 318 such rows beside the
+owner's 29; `read_frame_labels` leaves them out, so neither a bundle nor
+a replay scores against them until the owner validates the frame and
+the note goes. Do not score on them by any other path either.
 
 **Trailing recall measures the labelling, not the detector -- do not
 chase it.** Per session, the median `elongation_ratio` of the frames

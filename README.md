@@ -582,7 +582,7 @@ session, which is what makes two frames comparable at all.
 | PgUp / PgDn | ten at a time |
 | drag the bar | scrub through the list with the mouse |
 | Ctrl+F | find a frame by its time |
-| 1-6 | tick a category — several per frame, `1` says the frame is fine |
+| 1-7 | tick a category — several per frame, `1` says the frame is fine, `7` is dew on the lens |
 | 0 | untick everything on this frame |
 | A | tick exactly what the detector said, ready to validate |
 | Enter | record it and move on |
@@ -598,6 +598,13 @@ The category keys **tick**, they do not toggle: going through one
 category means pressing the same key frame after frame, and a toggle
 turns the second press on an already-ticked frame into a silent
 unticking. `0`, or the mouse, undoes one.
+
+**Dew** is the one tick the detector has no folder for. Fog on the lens
+dims the stars without brightening the sky, which is exactly what the
+veil rule looks for, so the detector reports it as haze. Tick it as Dew
+all the same: a frame labelled Dew counts as agreeing with a
+Clouds_Haze alert, and keeping the two apart in the labels is what will
+let a later version tell them apart.
 
 One step past the last frame is an **end card** across the image area,
 saying which list it was and how much of it is labelled. Paging is done

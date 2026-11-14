@@ -64,10 +64,14 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 
-# The owner labels a doubled frame "Doubling"; the detector files it
-# under Trailing, with the offset spelled out in the message. The two
-# agree, so scoring treats them as one word.
-LABEL_ALIASES = {"Doubling": CATEGORY_TRAILING}
+# Labels the detector reports under another name. A doubled frame is
+# "Doubling" to the owner and Trailing to the detector, with the offset
+# spelled out in the message. Fog on the lens is "Dew" to the owner and,
+# for want of a way to tell it from cloud yet, Clouds_Haze to the
+# detector -- its veil rule is what catches it. Both pairs agree, so
+# scoring treats each as one word; without the second, every cloud alert
+# on a frame ticked Dew would count as a mistake.
+LABEL_ALIASES = {"Doubling": CATEGORY_TRAILING, "Dew": CATEGORY_CLOUDS}
 
 # Satellite, meteor and aircraft are one detection wearing three hats:
 # the track is found the same way and only the width and brightness
